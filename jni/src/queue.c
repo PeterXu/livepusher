@@ -7,7 +7,7 @@ typedef struct queue_node {
 	void *p;
 } node;
 
-// static node *phead = NULL;
+static node *phead = NULL;
 static int count = 0;
 
 static node* create_node(void *pval) {

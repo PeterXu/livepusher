@@ -51,7 +51,7 @@ typedef struct video_enc_t {
 	int height;
 	int bitrate;
 	int fps;
-}
+}video_enc_t;
 
 // rtmp
 #define _RTMP_Free(_rtmp)  if(_rtmp) {RTMP_Free(_rtmp); _rtmp = NULL;}
@@ -60,18 +60,14 @@ typedef struct video_enc_t {
 typedef struct proto_net_t {
 	RTMP *rtmp;
 	char* rtmp_path;
-	ULONG start_time;
-	ULONG timeoffset;
 }proto_net_t;
 
 
-typedef sturct pusher_t {
+typedef struct pusher_t {
 	int publishing;
 	int readyRtmp;
-
-	pthread_t publisher_tid;
-	pthread_mutex_t mutex;
-	pthread_cond_t cond;
+	ULONG start_time;
+	ULONG timeoffset;
 
 	audio_enc_t audio;
 	video_enc_t video;
@@ -81,9 +77,14 @@ typedef sturct pusher_t {
 static jni_t 	s_jni;
 static pusher_t s_pusher;
 
-s_pusher.mutex = PTHREAD_MUTEX_INITIALIZER;
-s_pusher.cond = PTHREAD_COND_INITIALIZER;
+static pthread_t s_tid;
+static pthread_mutex_t s_mutex = PTHREAD_MUTEX_INITIALIZER;
+static pthread_cond_t s_cond = PTHREAD_COND_INITIALIZER;
 
+
+
+
+void add_aac_sequence_header(audio_enc_t *audio);
 
 //===============================================
 
@@ -111,9 +112,15 @@ static void rtmp_log_debug(int level, const char *format, va_list vl) {
 #endif
 }
 
-void throwNativeInfo(JNIEnv *env, jmethodID methodId, int code) {
+void throwNativeInfo(jmethodID methodId, int code) {
+    JNIEnv* env = NULL;
+    (*s_jni.jvm)->GetEnv(s_jni.jvm, (void**) &env, JNI_VERSION_1_4);
+    if (!env) {
+        return;
+    }
+
 	if (env && methodId && s_jni.pusher_obj) {
-		(*env)->CallVoidMethodA(env, s_jni.pusher_obj, methodId, &code);
+		(*env)->CallVoidMethodA(env, s_jni.pusher_obj, methodId, (jvalue *)&code);
 	}
 }
 
@@ -154,7 +161,7 @@ void* publiser(void *args) {
 		s_pusher.proto.rtmp = RTMP_Alloc();
 		if (!s_pusher.proto.rtmp) {
 			LOGD("rtmp alloc failed");
-			throwNativeInfo(env, s_jni.errorId, -104);
+			throwNativeInfo(s_jni.errorId, -104);
 			goto END;
 		}
 
@@ -166,7 +173,7 @@ void* publiser(void *args) {
 		LOGI("RTMP_SetupURL RTMP is :%d, path:%s", s_pusher.proto.rtmp?1:0, s_pusher.proto.rtmp_path);
 		if (!RTMP_SetupURL(s_pusher.proto.rtmp, s_pusher.proto.rtmp_path)) {
 			LOGD("RTMP_SetupURL() failed!");
-			throwNativeInfo(env, s_jni.errorId, -104);
+			throwNativeInfo(s_jni.errorId, -104);
 			goto END;
 		}
 
@@ -176,28 +183,28 @@ void* publiser(void *args) {
 		// connect server
 		if (!RTMP_Connect(s_pusher.proto.rtmp, NULL)) {
 			LOGD("RTMP_Connect() failed!");
-			throwNativeInfo(env, s_jni.errorId, -104);
+			throwNativeInfo(s_jni.errorId, -104);
 			goto END;
 		}
 
 		// connect stream
 		if (!RTMP_ConnectStream(s_pusher.proto.rtmp, 0)) {
 			LOGD("RTMP_ConnectStream() failed!");
-			throwNativeInfo(env, s_jni.errorId, -104);
+			throwNativeInfo(s_jni.errorId, -104);
 			goto END;
 		}
 
 		int tmp = 5;
 		LOGI("RTMP Loop start");
-		throwNativeInfo(env, s_jni.stateId, 100);
+		throwNativeInfo(s_jni.stateId, 100);
 		s_pusher.readyRtmp = 1;
 
-		add_aac_sequence_header();
+		add_aac_sequence_header(&s_pusher.audio);
 		while (s_pusher.publishing) {
-			pthread_mutex_lock(&mutex);
-			pthread_cond_wait(&cond, &mutex);
-			if (!publishing) {
-				pthread_mutex_unlock(&mutex);
+			pthread_mutex_lock(&s_mutex);
+			pthread_cond_wait(&s_cond, &s_mutex);
+			if (!s_pusher.publishing) {
+				pthread_mutex_unlock(&s_mutex);
 				goto END;
 			}
 
@@ -205,7 +212,7 @@ void* publiser(void *args) {
 			if (packet) {
 				queue_delete_first();
 			}
-			pthread_mutex_unlock(&mutex);
+			pthread_mutex_unlock(&s_mutex);
 
 			if (packet) {
 				queue_delete_first();
@@ -214,7 +221,7 @@ void* publiser(void *args) {
 				if (!i) {
 					RTMPPacket_Free(packet);
 					LOGD("RTMP_SendPacket failed");
-					throwNativeInfo(env, s_jni.errorId, -104);
+					throwNativeInfo(s_jni.errorId, -104);
 					goto END;
 				}
 				RTMPPacket_Free(packet);
@@ -246,18 +253,18 @@ END:
 
 	//pthread_mutex_destroy(&mutex);
 	//pthread_cond_destroy(&cond);
-	throwNativeInfo(env, s_jni.stateId, 101);
-	(*jvm)->DetachCurrentThread(s_jni.jvm);
+	throwNativeInfo(s_jni.stateId, 101);
+	(*s_jni.jvm)->DetachCurrentThread(s_jni.jvm);
 	pthread_exit(0);
 }
 
 void add_rtmp_packet(RTMPPacket *packet) {
-	pthread_mutex_lock(&mutex);
+	pthread_mutex_lock(&s_mutex);
 	if (s_pusher.publishing && s_pusher.readyRtmp) {
 		queue_append_last(packet);
 	}
-	pthread_cond_signal(&cond);
-	pthread_mutex_unlock(&mutex);
+	pthread_cond_signal(&s_cond);
+	pthread_mutex_unlock(&s_mutex);
 }
 
 void add_aac_sequence_header(audio_enc_t *audio) {
@@ -414,10 +421,10 @@ static void x264_log_default2(void *p_unused, int i_level, const char *psz_fmt, 
 void setVideoOptions(video_enc_t *video, jint width, jint height, jint bitrate, jint fps) {
 	LOGD("Video options: %dx%d, %dkb/s, %d", width, height, bitrate/1000, fps);
 	x264_param_t param;
-	if (video->hanlde) {
+	if (video->handle) {
 		LOGD("Video encoder has been opened");
 		if (video->fps != fps || video->bitrate != bitrate || video->height != height || video->width != width) {
-			x264_encoder_close(video->hanlde);
+			x264_encoder_close(video->handle);
 			video->handle = 0;
 			x264_free(video->pic_in);
 			x264_free(video->pic_out);
@@ -431,7 +438,7 @@ void setVideoOptions(video_enc_t *video, jint width, jint height, jint bitrate, 
 	video->bitrate = bitrate;
 	video->fps = fps;
 	video->y_len = width * height;
-	video->u_v_len = y_len / 4;
+	video->u_v_len = video->y_len / 4;
 	x264_param_default_preset(&param, "ultrafast", "zerolatency");
 
 	//param.pf_log = x264_log_default2;
@@ -459,7 +466,7 @@ void setVideoOptions(video_enc_t *video, jint width, jint height, jint bitrate, 
 	video->handle = x264_encoder_open(&param);
 	if (!video->handle) {
 		LOGI("Video encoder open fail");
-		throwNativeInfo(env, s_jni.errorId, -103);
+		throwNativeInfo(s_jni.errorId, -103);
 		return;
 	}
 
@@ -471,7 +478,7 @@ void setVideoOptions(video_enc_t *video, jint width, jint height, jint bitrate, 
 JNIEXPORT void JNICALL Java_com_zenvv_live_jni_PusherNative_setVideoOptions(
 		JNIEnv *env, jobject thiz, jint width, jint height, jint bitrate,
 		jint fps) {
-	setVideoOptions(width, height, bitrate, fps);
+	setVideoOptions(&s_pusher.video, width, height, bitrate, fps);
 }
 
 
@@ -487,7 +494,7 @@ void setAudioOptions(audio_enc_t *audio, jint sampleRate, jint channel) {
 	audio->handle = faacEncOpen(nSampleRate, nChannels, &audio->nInputSamples, &audio->nMaxOutputBytes);
 	if (!audio->handle) {
 		LOGI("audio encoder open fail");
-		throwNativeInfo(env, s_jni.errorId, -102);
+		throwNativeInfo(s_jni.errorId, -102);
 		return;
 	}
 
@@ -516,16 +523,16 @@ JNIEXPORT void JNICALL Java_com_jutong_live_jni_PusherNative_setAudioOptions(
 void startPusher(pusher_t *pusher, const char* path) {
 	LOGD("Native start Pusher");
 
-	pusher->rtmp.rtmp_path = malloc(strlen(path) + 1);
-	memset(pusher->rtmp.rtmp_path, 0, strlen(path) + 1);
-	memcpy(pusher->rtmp.rtmp_path, path, strlen(path));
+	pusher->proto.rtmp_path = malloc(strlen(path) + 1);
+	memset(pusher->proto.rtmp_path, 0, strlen(path) + 1);
+	memcpy(pusher->proto.rtmp_path, path, strlen(path));
 	create_queue();
 
 	//RTMP_LogSetCallback(rtmp_log_debug);
 	//FILE *fp = fopen("mnt/sdcard/rtmp_log1.txt", "a+");
 	//RTMP_LogSetOutput(fp);
 
-	pthread_create(&pusher->publisher_tid, NULL, publiser, NULL);
+	pthread_create(&s_tid, NULL, publiser, NULL);
 	pusher->start_time = RTMP_GetTime();
 }
 
@@ -573,7 +580,7 @@ JNIEXPORT jint JNICALL Java_com_zenvv_live_jni_PusherNative_getInputSamples() { 
 }
 
 void fireVideo(video_enc_t *video, jbyte *nv21_buffer) {
-	if (!video.handle) {
+	if (!video || !video->handle) {
 		return;
 	}
 
@@ -581,10 +588,10 @@ void fireVideo(video_enc_t *video, jbyte *nv21_buffer) {
 	jbyte* v = video->pic_in->img.plane[2];
 	// nv21 to yuv420p  y = w*h,u/v=w*h/4
 	// nv21 = yvu, yuv420p=yuv, y=y, u=y+1+1, v=y+1
-	memcpy(video->pic_in->img.plane[0], nv21_buffer, y_len);
-	for (int i = 0; i < u_v_len; i++) {
-		*(u + i) = *(nv21_buffer + y_len + i * 2 + 1);
-		*(v + i) = *(nv21_buffer + y_len + i * 2);
+	memcpy(video->pic_in->img.plane[0], nv21_buffer, video->y_len);
+	for (int i = 0; i < video->u_v_len; i++) {
+		*(u + i) = *(nv21_buffer + video->y_len + i * 2 + 1);
+		*(v + i) = *(nv21_buffer + video->y_len + i * 2);
 	}
 
 	int nNal = -1;
@@ -629,10 +636,10 @@ JNIEXPORT void JNICALL Java_com_zenvv_live_jni_PusherNative_fireVideo(
 
 JNIEXPORT void JNICALL Java_com_zenvv_live_jni_PusherNative_stopPusher(
 		JNIEnv *env, jobject thiz) {
-	pthread_mutex_lock(&mutex);
+	pthread_mutex_lock(&s_mutex);
 	s_pusher.publishing = 0;
-	pthread_cond_signal(&cond);
-	pthread_mutex_unlock(&mutex);
+	pthread_cond_signal(&s_cond);
+	pthread_mutex_unlock(&s_mutex);
 }
 
 JNIEXPORT void JNICALL Java_com_zenvv_live_jni_PusherNative_release(
