@@ -515,7 +515,7 @@ void setAudioOptions(audio_enc_t *audio, jint sampleRate, jint channel) {
 	}
 }
 
-JNIEXPORT void JNICALL Java_com_jutong_live_jni_PusherNative_setAudioOptions(
+JNIEXPORT void JNICALL Java_com_zenvv_live_jni_PusherNative_setAudioOptions(
 		JNIEnv *env, jobject thiz, jint sampleRate, jint channel) {
 	setAudioOptions(&s_pusher.audio, sampleRate, channel);
 }

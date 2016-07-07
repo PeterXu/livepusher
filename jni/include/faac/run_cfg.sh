@@ -1,24 +1,36 @@
 #!/bin/bash
 
+ROOT=$(pwd)
 CC=`ndk-which gcc`
-ROOT=`dirname $CC`
+CCPATH=`dirname $CC`
 
-ARCH=arm            # aarch64,arm
-PREFIX=armeabi-v7a  # arm64-v8a,armeabi,armeabi-v7a,armeabi-v7a-neon
-HOST=$ARCH-linux
+ARCH=${ARCH:-arm}               # aarch64,arm
+EABI=${EABI:-armeabi-v7a}       # arm64-v8a,armeabi,armeabi-v7a,armeabi-v7a-neon
+HOST=$ARCH-linux-androideabi
+SYSROOT=$ANDROID_NDK/platforms/android-9/arch-$ARCH
 
-export SYSROOT=$ANDROID_NDK/platforms/android-15/arch-arm
-export PATH=$PATH:$ROOT
+export PATH=$PATH:$CCPATH
 export CC="$CC --sysroot=$SYSROOT"
 export CXX="$(ndk-which g++) --sysroot=$SYSROOT"
+export LDFLAGS="-Wl,-rpath-link=$SYSROOT/usr/lib -L$SYSROOT/usr/lib -nostdlib -lc -lm -ldl -llog -lgcc"
+
+
+PREFIX="$ROOT/../libs/faac/$EABI"
+INCDIR="$ROOT/../libs/faac/include"
+rm -rf $PREFIX $INCDIR
+
 
 ./configure \
-    --prefix=$(pwd)/../libs/faac/$PREFIX \
-    --includedir=$(pwd)/../libs/faac/include \
+    --prefix=$PREFIX \
+    --includedir=$INCDIR \
     --enable-shared \
     --enable-static \
     --with-pic \
     --without-mp4v2 \
     --host=$HOST
 
+make clean || true
 make install
+
+
+exit 0
