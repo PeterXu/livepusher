@@ -1,16 +1,25 @@
 #!/bin/bash
 
+ROOT=$(pwd)
 CC=`ndk-which gcc`
-ROOT=`dirname $CC`
+CCPATH=`dirname $CC`
 
-ARCH=arm            # aarch64,arm
-PREFIX=armeabi-v7a  # arm64-v8a,armeabi,armeabi-v7a,armeabi-v7a-neon
+ARCH=${ARCH:-arm}               # aarch64,arm
+EABI=${EABI:-armeabi-v7a}       # arm64-v8a,armeabi,armeabi-v7a,armeabi-v7a-neon
 HOST=$ARCH-linux-androideabi
+SYSROOT=$ANDROID_NDK/platforms/android-9/arch-$ARCH
 
-export SYSROOT=$ANDROID_NDK/platforms/android-15/arch-arm
-export PATH=$PATH:$ROOT
+export PATH=$PATH:$CCPATH
 export CC="$CC --sysroot=$SYSROOT"
 export CXX="$(ndk-which g++) --sysroot=$SYSROOT"
 
-make install SYS=android prefix=`pwd`/../libs/rtmpdump/$PREFIX incdir=$(pwd)/../libs/rtmpdump/include CRYPTO= SHARED=  XDEF=-DNO_SSL CROSS_COMPILE=$HOST-  INC="$CFLAGS -I$SYSROOT/usr/include" XCFLAGS="--sysroot=$SYSROOT -fpic" XLDFLAGS="-L$SYSROOT/usr/lib --sysroot=$SYSROOT"
 
+
+PREFIX="$ROOT/../libs/rtmpdump/$EABI"
+INCDIR="$ROOT/../libs/rtmpdump/include"
+rm -rf $PREFIX $INCDIR
+
+make clean
+make install SYS=android prefix=$PREFIX incdir=$INCDIR CRYPTO= SHARED=  XDEF=-DNO_SSL CROSS_COMPILE=$HOST-  INC="$CFLAGS -I$SYSROOT/usr/include" XCFLAGS="--sysroot=$SYSROOT -fpic" XLDFLAGS="--sysroot=$SYSROOT"
+
+exit 0
