@@ -28,4 +28,4 @@ export CC="$CC --sysroot=$SYSROOT"
     --sysroot=$SYSROOT \
     --cross-prefix=$HOST-
 
-make
+make install

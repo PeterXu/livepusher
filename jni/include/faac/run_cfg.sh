@@ -21,4 +21,4 @@ export CXX="$(ndk-which g++) --sysroot=$SYSROOT"
     --without-mp4v2 \
     --host=$HOST
 
-make
+make install
