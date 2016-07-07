@@ -1,0 +1,3 @@
+*.o
+android-toolchain
+libs

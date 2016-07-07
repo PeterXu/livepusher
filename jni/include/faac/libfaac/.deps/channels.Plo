@@ -1,0 +1,88 @@
+channels.lo: channels.c channels.h coder.h util.h \
+ /var/zdisk/wspace/offical/livepusher/jni/include/android-toolchain/aarch64-linux-android/sysroot/usr/include/stdlib.h \
+ /var/zdisk/wspace/offical/livepusher/jni/include/android-toolchain/aarch64-linux-android/sysroot/usr/include/sys/cdefs.h \
+ /var/zdisk/wspace/offical/livepusher/jni/include/android-toolchain/aarch64-linux-android/sysroot/usr/include/sys/cdefs_elf.h \
+ /var/zdisk/wspace/offical/livepusher/jni/include/android-toolchain/aarch64-linux-android/sysroot/usr/include/android/api-level.h \
+ /var/zdisk/wspace/offical/livepusher/jni/include/android-toolchain/aarch64-linux-android/lib/gcc/aarch64-linux-android/4.9/include/stddef.h \
+ /var/zdisk/wspace/offical/livepusher/jni/include/android-toolchain/aarch64-linux-android/sysroot/usr/include/string.h \
+ /var/zdisk/wspace/offical/livepusher/jni/include/android-toolchain/aarch64-linux-android/sysroot/usr/include/malloc.h \
+ /var/zdisk/wspace/offical/livepusher/jni/include/android-toolchain/aarch64-linux-android/sysroot/usr/include/xlocale.h \
+ /var/zdisk/wspace/offical/livepusher/jni/include/android-toolchain/aarch64-linux-android/sysroot/usr/include/alloca.h \
+ /var/zdisk/wspace/offical/livepusher/jni/include/android-toolchain/aarch64-linux-android/sysroot/usr/include/strings.h \
+ /var/zdisk/wspace/offical/livepusher/jni/include/android-toolchain/aarch64-linux-android/sysroot/usr/include/sys/types.h \
+ /var/zdisk/wspace/offical/livepusher/jni/include/android-toolchain/aarch64-linux-android/lib/gcc/aarch64-linux-android/4.9/include/stdint.h \
+ /var/zdisk/wspace/offical/livepusher/jni/include/android-toolchain/aarch64-linux-android/sysroot/usr/include/stdint.h \
+ /var/zdisk/wspace/offical/livepusher/jni/include/android-toolchain/aarch64-linux-android/sysroot/usr/include/machine/wchar_limits.h \
+ /var/zdisk/wspace/offical/livepusher/jni/include/android-toolchain/aarch64-linux-android/sysroot/usr/include/linux/types.h \
+ /var/zdisk/wspace/offical/livepusher/jni/include/android-toolchain/aarch64-linux-android/sysroot/usr/include/asm/types.h \
+ /var/zdisk/wspace/offical/livepusher/jni/include/android-toolchain/aarch64-linux-android/sysroot/usr/include/asm-generic/types.h \
+ /var/zdisk/wspace/offical/livepusher/jni/include/android-toolchain/aarch64-linux-android/sysroot/usr/include/asm-generic/int-ll64.h \
+ /var/zdisk/wspace/offical/livepusher/jni/include/android-toolchain/aarch64-linux-android/sysroot/usr/include/asm/bitsperlong.h \
+ /var/zdisk/wspace/offical/livepusher/jni/include/android-toolchain/aarch64-linux-android/sysroot/usr/include/asm-generic/bitsperlong.h \
+ /var/zdisk/wspace/offical/livepusher/jni/include/android-toolchain/aarch64-linux-android/sysroot/usr/include/linux/posix_types.h \
+ /var/zdisk/wspace/offical/livepusher/jni/include/android-toolchain/aarch64-linux-android/sysroot/usr/include/linux/stddef.h \
+ /var/zdisk/wspace/offical/livepusher/jni/include/android-toolchain/aarch64-linux-android/sysroot/usr/include/linux/compiler.h \
+ /var/zdisk/wspace/offical/livepusher/jni/include/android-toolchain/aarch64-linux-android/sysroot/usr/include/asm/posix_types.h \
+ /var/zdisk/wspace/offical/livepusher/jni/include/android-toolchain/aarch64-linux-android/sysroot/usr/include/asm-generic/posix_types.h \
+ /var/zdisk/wspace/offical/livepusher/jni/include/android-toolchain/aarch64-linux-android/sysroot/usr/include/sys/sysmacros.h \
+ /var/zdisk/wspace/offical/livepusher/jni/include/android-toolchain/aarch64-linux-android/sysroot/usr/include/memory.h
+
+channels.h:
+
+coder.h:
+
+util.h:
+
+/var/zdisk/wspace/offical/livepusher/jni/include/android-toolchain/aarch64-linux-android/sysroot/usr/include/stdlib.h:
+
+/var/zdisk/wspace/offical/livepusher/jni/include/android-toolchain/aarch64-linux-android/sysroot/usr/include/sys/cdefs.h:
+
+/var/zdisk/wspace/offical/livepusher/jni/include/android-toolchain/aarch64-linux-android/sysroot/usr/include/sys/cdefs_elf.h:
+
+/var/zdisk/wspace/offical/livepusher/jni/include/android-toolchain/aarch64-linux-android/sysroot/usr/include/android/api-level.h:
+
+/var/zdisk/wspace/offical/livepusher/jni/include/android-toolchain/aarch64-linux-android/lib/gcc/aarch64-linux-android/4.9/include/stddef.h:
+
+/var/zdisk/wspace/offical/livepusher/jni/include/android-toolchain/aarch64-linux-android/sysroot/usr/include/string.h:
+
+/var/zdisk/wspace/offical/livepusher/jni/include/android-toolchain/aarch64-linux-android/sysroot/usr/include/malloc.h:
+
+/var/zdisk/wspace/offical/livepusher/jni/include/android-toolchain/aarch64-linux-android/sysroot/usr/include/xlocale.h:
+
+/var/zdisk/wspace/offical/livepusher/jni/include/android-toolchain/aarch64-linux-android/sysroot/usr/include/alloca.h:
+
+/var/zdisk/wspace/offical/livepusher/jni/include/android-toolchain/aarch64-linux-android/sysroot/usr/include/strings.h:
+
+/var/zdisk/wspace/offical/livepusher/jni/include/android-toolchain/aarch64-linux-android/sysroot/usr/include/sys/types.h:
+
+/var/zdisk/wspace/offical/livepusher/jni/include/android-toolchain/aarch64-linux-android/lib/gcc/aarch64-linux-android/4.9/include/stdint.h:
+
+/var/zdisk/wspace/offical/livepusher/jni/include/android-toolchain/aarch64-linux-android/sysroot/usr/include/stdint.h:
+
+/var/zdisk/wspace/offical/livepusher/jni/include/android-toolchain/aarch64-linux-android/sysroot/usr/include/machine/wchar_limits.h:
+
+/var/zdisk/wspace/offical/livepusher/jni/include/android-toolchain/aarch64-linux-android/sysroot/usr/include/linux/types.h:
+
+/var/zdisk/wspace/offical/livepusher/jni/include/android-toolchain/aarch64-linux-android/sysroot/usr/include/asm/types.h:
+
+/var/zdisk/wspace/offical/livepusher/jni/include/android-toolchain/aarch64-linux-android/sysroot/usr/include/asm-generic/types.h:
+
+/var/zdisk/wspace/offical/livepusher/jni/include/android-toolchain/aarch64-linux-android/sysroot/usr/include/asm-generic/int-ll64.h:
+
+/var/zdisk/wspace/offical/livepusher/jni/include/android-toolchain/aarch64-linux-android/sysroot/usr/include/asm/bitsperlong.h:
+
+/var/zdisk/wspace/offical/livepusher/jni/include/android-toolchain/aarch64-linux-android/sysroot/usr/include/asm-generic/bitsperlong.h:
+
+/var/zdisk/wspace/offical/livepusher/jni/include/android-toolchain/aarch64-linux-android/sysroot/usr/include/linux/posix_types.h:
+
+/var/zdisk/wspace/offical/livepusher/jni/include/android-toolchain/aarch64-linux-android/sysroot/usr/include/linux/stddef.h:
+
+/var/zdisk/wspace/offical/livepusher/jni/include/android-toolchain/aarch64-linux-android/sysroot/usr/include/linux/compiler.h:
+
+/var/zdisk/wspace/offical/livepusher/jni/include/android-toolchain/aarch64-linux-android/sysroot/usr/include/asm/posix_types.h:
+
+/var/zdisk/wspace/offical/livepusher/jni/include/android-toolchain/aarch64-linux-android/sysroot/usr/include/asm-generic/posix_types.h:
+
+/var/zdisk/wspace/offical/livepusher/jni/include/android-toolchain/aarch64-linux-android/sysroot/usr/include/sys/sysmacros.h:
+
+/var/zdisk/wspace/offical/livepusher/jni/include/android-toolchain/aarch64-linux-android/sysroot/usr/include/memory.h:
