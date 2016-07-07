@@ -25,7 +25,7 @@
         android:label="@string/app_name"
         android:theme="@android:style/Theme.Light" >
         <activity
-            android:name="com.jutong.live.MainActivity"
+            android:name="com.zenvv.live.MainActivity"
             android:configChanges="mcc|mnc|keyboardHidden|keyboard|orientation|screenLayout|screenSize|navigation|fontScale"
             android:label="@string/app_name" >
             <intent-filter>

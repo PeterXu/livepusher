@@ -1,4 +1,4 @@
-package com.jutong.live;
+package com.zenvv.live;
 
 import android.annotation.TargetApi;
 import android.app.Activity;
@@ -16,9 +16,11 @@ import android.widget.Button;
 import android.widget.Toast;
 
 import com.example.myrtmp.R;
+import com.zenvv.live.pusher.LivePusher;
+import com.zenvv.live.pusher.LiveStateListener;
 
 public class MainActivity extends Activity implements OnClickListener,
-		Callback, LiveStateChangeListener {
+		Callback, LiveStateListener {
 
 	private Button button01;
 	private SurfaceView mSurfaceView;
@@ -74,7 +76,7 @@ public class MainActivity extends Activity implements OnClickListener,
 		mSurfaceHolder.addCallback(this);
 		livePusher = new LivePusher(this, 960, 720, 1024000, 15,
 				CameraInfo.CAMERA_FACING_FRONT);
-		livePusher.setLiveStateChangeListener(this);
+		livePusher.setLiveStateListener(this);
 		livePusher.prepare(mSurfaceHolder);
 
 	}
@@ -100,8 +102,7 @@ public class MainActivity extends Activity implements OnClickListener,
 		} else {
 			button01.setText(R.string.stop);
 			isStart = true;
-			livePusher.startPusher("rtmp://xxx/xxx/xxx");// TODO: 璁剧疆娴佸獟浣撴湇鍔″櫒鍦板潃
-
+			livePusher.startPusher("rtmp://10.11.40.4/app/live");
 		}
 	}
 

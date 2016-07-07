@@ -1,23 +1,21 @@
-package com.jutong.live;
+package com.zenvv.live.pusher;
 
 import android.app.Activity;
 import android.view.SurfaceHolder;
 
-import com.jutong.live.jni.PusherNative;
-import com.jutong.live.param.AudioParam;
-import com.jutong.live.param.VideoParam;
-import com.jutong.live.pusher.AudioPusher;
-import com.jutong.live.pusher.VideoPusher;
+import com.zenvv.live.jni.PusherNative;
 
 public class LivePusher {
-
 	private final static String TAG = "LivePusher";
+	
 	private VideoParam videoParam;
 	private AudioParam audioParam;
-	private VideoPusher videoPusher;
+	
 	private PusherNative mNative;
+	private VideoPusher videoPusher;
 	private AudioPusher audioPusher;
-	private LiveStateChangeListener mListener;
+	
+	private LiveStateListener mListener;
 	private Activity mActivity;
 
 	static {
@@ -27,18 +25,22 @@ public class LivePusher {
 	public LivePusher(Activity activity, int width, int height, int bitrate,
 			int fps, int cameraId) {
 		mActivity = activity;
-		videoParam = new VideoParam(width, height, bitrate, fps, cameraId);
-		audioParam = new AudioParam();
 		mNative = new PusherNative();
+		
+		videoParam = new VideoParam(cameraId, width, height, bitrate, fps, 10);
+		audioParam = new AudioParam();
 	}
 
 	public void prepare(SurfaceHolder surfaceHolder) {
 		surfaceHolder.setType(SurfaceHolder.SURFACE_TYPE_PUSH_BUFFERS);
-		videoPusher = new VideoPusher(mActivity, surfaceHolder, videoParam,
-				mNative);
+		
+		// create videoPusher
+		videoPusher = new VideoPusher(mActivity, surfaceHolder, videoParam, mNative);
+		videoPusher.setLiveStateListener(mListener);
+		
+		// create audioPusher
 		audioPusher = new AudioPusher(audioParam, mNative);
-		videoPusher.setLiveStateChangeListener(mListener);
-		audioPusher.setLiveStateChangeListener(mListener);
+		audioPusher.setLiveStateListener(mListener);
 	}
 
 	public void startPusher(String url) {
@@ -60,24 +62,25 @@ public class LivePusher {
 	public void relase() {
 		mActivity = null;
 		stopPusher();
-		videoPusher.setLiveStateChangeListener(null);
-		audioPusher.setLiveStateChangeListener(null);
-		mNative.setLiveStateChangeListener(null);
+		
+		videoPusher.setLiveStateListener(null);
+		audioPusher.setLiveStateListener(null);
+		mNative.setLiveStateListener(null);
+		
 		videoPusher.release();
 		audioPusher.release();
 		mNative.release();
 	}
 
-	public void setLiveStateChangeListener(LiveStateChangeListener listener) {
+	public void setLiveStateListener(LiveStateListener listener) {
 		mListener = listener;
-		mNative.setLiveStateChangeListener(listener);
+		mNative.setLiveStateListener(listener);
 		if (null != videoPusher) {
-			videoPusher.setLiveStateChangeListener(listener);
+			videoPusher.setLiveStateListener(listener);
 		}
 		if (null != audioPusher) {
-			audioPusher.setLiveStateChangeListener(listener);
+			audioPusher.setLiveStateListener(listener);
 		}
-
 	}
 
 }

@@ -1,28 +1,30 @@
-package com.jutong.live.pusher;
+package com.zenvv.live.pusher;
 
 import android.media.AudioFormat;
 import android.media.AudioRecord;
 import android.media.MediaRecorder;
 import android.util.Log;
 
-import com.jutong.live.jni.PusherNative;
-import com.jutong.live.param.AudioParam;
+import com.zenvv.live.jni.PusherNative;
 
-public class AudioPusher extends Pusher {
+public class AudioPusher extends MediaPusher {
 	private final static String TAG = "AudioPusher";
+	
 	private AudioParam mParam;
 	private int minBufferSize;
 	private AudioRecord audioRecord;
 
 	public AudioPusher(AudioParam param, PusherNative pusherNative) {
 		super(pusherNative);
+		
 		mParam = param;
-		// int channel = mParam.getChannel() == 1 ? AudioFormat.CHANNEL_IN_MONO
-		// : AudioFormat.CHANNEL_IN_STEREO;
+		int channel = mParam.getChannel() == 1 ? 
+				AudioFormat.CHANNEL_IN_MONO : AudioFormat.CHANNEL_IN_STEREO;
 		minBufferSize = AudioRecord.getMinBufferSize(mParam.getSampleRate(),
-				AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT);
+				channel, AudioFormat.ENCODING_PCM_16BIT);
+		
 		audioRecord = new AudioRecord(MediaRecorder.AudioSource.MIC,
-				mParam.getSampleRate(), AudioFormat.CHANNEL_IN_MONO,
+				mParam.getSampleRate(), channel,
 				AudioFormat.ENCODING_PCM_16BIT, minBufferSize);
 		mNative.setAudioOptions(mParam.getSampleRate(), mParam.getChannel());
 		Log.d(TAG, "audio input:" + mNative.getInputSamples());

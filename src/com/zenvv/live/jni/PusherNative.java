@@ -1,18 +1,18 @@
-package com.jutong.live.jni;
+package com.zenvv.live.jni;
 
 import android.util.Log;
 
-import com.jutong.live.LiveStateChangeListener;
+import com.zenvv.live.pusher.LiveStateListener;
 
 public class PusherNative {
 
-	private LiveStateChangeListener mListener;
+	private LiveStateListener mListener;
 
 	public PusherNative() {
 
 	}
 
-	public void setLiveStateChangeListener(LiveStateChangeListener listener) {
+	public void setLiveStateListener(LiveStateListener listener) {
 		mListener = listener;
 	}
 
@@ -31,8 +31,7 @@ public class PusherNative {
 		}
 	}
 
-	public native void setVideoOptions(int width, int height, int bitrate,
-			int fps);
+	public native void setVideoOptions(int width, int height, int bitrate, int fps);
 
 	public native void setAudioOptions(int sampleRate, int channel);
 
