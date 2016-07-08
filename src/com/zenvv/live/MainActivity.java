@@ -15,7 +15,7 @@ import android.view.View.OnClickListener;
 import android.widget.Button;
 import android.widget.Toast;
 
-import com.example.myrtmp.R;
+import com.zenvv.livepusher.R;
 import com.zenvv.live.pusher.LivePusher;
 import com.zenvv.live.pusher.LiveStateListener;
 
