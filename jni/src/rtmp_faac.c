@@ -12,9 +12,9 @@
 
 //#define DEBUG
 #ifdef DEBUG
-#define LOGD(...) __android_log_print(3,"NDK",__VA_ARGS__)
-#define LOGI(...) __android_log_print(4,"NDK",__VA_ARGS__)
-#define LOGE(...) __android_log_print(5,"NDK",__VA_ARGS__)
+#define LOGD(...) __android_log_print(ANDROID_LOG_DEBUG, "NDK", __VA_ARGS__)
+#define LOGI(...) __android_log_print(ANDROID_LOG_INFO,  "NDK", __VA_ARGS__)
+#define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, "NDK", __VA_ARGS__)
 #else
 #define LOGD(...)
 #define LOGI(...)
@@ -84,7 +84,6 @@ static pthread_cond_t s_cond = PTHREAD_COND_INITIALIZER;
 
 
 
-void add_aac_sequence_header(audio_enc_t *audio);
 
 //===============================================
 
@@ -127,6 +126,10 @@ void throwNativeInfo(jmethodID methodId, int code) {
 JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM *vm, void *reserved) {
 	JNIEnv* env = NULL;
 	jint result = -1;
+
+	memset(&s_jni, 0, sizeof(s_jni));
+	memset(&s_pusher, 0, sizeof(s_pusher));
+
 	s_jni.jvm = vm;
 	if (vm) {
 		LOGD("jvm init success");

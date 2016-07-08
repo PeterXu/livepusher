@@ -181,7 +181,7 @@ public class VideoPusher extends MediaPusher implements Callback, PreviewCallbac
 		}
 		mCamera.setDisplayOrientation(result);
 
-		// 如果是竖�?设置预览旋转90度，并且由于回调帧数据也�?��旋转�?��宽高�?��交换
+		// 
 		// if (mContext.getResources().getConfiguration().orientation ==
 		// Configuration.ORIENTATION_PORTRAIT) {
 		// mNative.setVideoOptions(mParam.getHeight(), mParam.getWidth(),
@@ -266,7 +266,7 @@ public class VideoPusher extends MediaPusher implements Callback, PreviewCallbac
 		// }
 		int width = mParam.getWidth(), height = mParam.getHeight();
 		int y_len = width * height;
-		int uvHeight = height >> 1;  // uv数据高为y数据高的�?��
+		int uvHeight = height >> 1; 
 		int k = 0;
 		if (mParam.getCameraId() == CameraInfo.CAMERA_FACING_BACK) {
 			for (int j = 0; j < width; j++) {
