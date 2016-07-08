@@ -78,7 +78,7 @@ public class AudioPusher extends MediaPusher {
 					&& audioRecord.getRecordingState() == AudioRecord.RECORDSTATE_RECORDING) {
 				byte[] buffer = new byte[2048];
 				int len = audioRecord.read(buffer, 0, buffer.length);
-				System.out.println(len);
+				//System.out.println(len);
 				if (0 < len) {
 					mNative.fireAudio(buffer, len);
 				}
