@@ -15,7 +15,7 @@ import android.view.View.OnClickListener;
 import android.widget.Button;
 import android.widget.Toast;
 
-import com.example.myrtmp.R;
+import com.zenvv.livepusher.R;
 
 public class MainActivity extends Activity implements OnClickListener,
 		Callback, LiveStateChangeListener {
@@ -100,7 +100,7 @@ public class MainActivity extends Activity implements OnClickListener,
 		} else {
 			button01.setText(R.string.stop);
 			isStart = true;
-			livePusher.startPusher("rtmp://xxx/xxx/xxx");// TODO: 璁剧疆娴佸獟浣撴湇鍔″櫒鍦板潃
+			livePusher.startPusher("rtmp://10.11.40.4/app/live");
 
 		}
 	}
