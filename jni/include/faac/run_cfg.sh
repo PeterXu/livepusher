@@ -6,7 +6,7 @@ CCPATH=`dirname $CC`
 
 ARCH=${ARCH:-arm}               # aarch64,arm
 EABI=${EABI:-armeabi-v7a}       # arm64-v8a,armeabi,armeabi-v7a,armeabi-v7a-neon
-HOST=$ARCH-linux-androideabi
+HOST=$ARCH-linux
 SYSROOT=$ANDROID_NDK/platforms/android-9/arch-$ARCH
 
 export PATH=$PATH:$CCPATH
