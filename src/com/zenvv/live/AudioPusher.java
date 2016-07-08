@@ -9,20 +9,22 @@ import com.zenvv.live.jni.PusherNative;
 
 public class AudioPusher extends Pusher {
 	private final static String TAG = "AudioPusher";
+	
 	private AudioParam mParam;
 	private int minBufferSize;
 	private AudioRecord audioRecord;
 
 	public AudioPusher(AudioParam param, PusherNative pusherNative) {
 		super(pusherNative);
+		
 		mParam = param;
-		// int channel = mParam.getChannel() == 1 ? AudioFormat.CHANNEL_IN_MONO
-		// : AudioFormat.CHANNEL_IN_STEREO;
-		minBufferSize = AudioRecord.getMinBufferSize(mParam.getSampleRate(),
-				AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT);
+		int channel = mParam.getChannel() == 1 ? AudioFormat.CHANNEL_IN_MONO
+				: AudioFormat.CHANNEL_IN_STEREO;
+		int pcmBits = AudioFormat.ENCODING_PCM_16BIT;
+		
+		minBufferSize = AudioRecord.getMinBufferSize(mParam.getSampleRate(), channel, pcmBits);
 		audioRecord = new AudioRecord(MediaRecorder.AudioSource.MIC,
-				mParam.getSampleRate(), AudioFormat.CHANNEL_IN_MONO,
-				AudioFormat.ENCODING_PCM_16BIT, minBufferSize);
+				mParam.getSampleRate(), channel, pcmBits, minBufferSize);
 		mNative.setAudioOptions(mParam.getSampleRate(), mParam.getChannel());
 		Log.d(TAG, "audio input:" + mNative.getInputSamples());
 	}
@@ -32,6 +34,7 @@ public class AudioPusher extends Pusher {
 		if (null == audioRecord) {
 			return;
 		}
+		
 		mPusherRuning = true;
 		if (audioRecord.getRecordingState() == AudioRecord.RECORDSTATE_STOPPED) {
 			try {
@@ -51,9 +54,11 @@ public class AudioPusher extends Pusher {
 		if (null == audioRecord) {
 			return;
 		}
+		
 		mPusherRuning = false;
-		if (audioRecord.getRecordingState() == AudioRecord.RECORDSTATE_RECORDING)
+		if (audioRecord.getRecordingState() == AudioRecord.RECORDSTATE_RECORDING) {
 			audioRecord.stop();
+		}
 	}
 
 	@Override
@@ -61,26 +66,26 @@ public class AudioPusher extends Pusher {
 		if (null == audioRecord) {
 			return;
 		}
+		
 		mPusherRuning = false;
-		if (audioRecord.getRecordingState() == AudioRecord.RECORDSTATE_STOPPED)
+		if (audioRecord.getRecordingState() == AudioRecord.RECORDSTATE_STOPPED) {
 			audioRecord.release();
-		audioRecord = null;
+		}
 	}
 
 	class AudioRecordTask implements Runnable {
-
 		@Override
 		public void run() {
+			byte[] buffer = new byte[2048];
 			while (mPusherRuning
 					&& audioRecord.getRecordingState() == AudioRecord.RECORDSTATE_RECORDING) {
-				byte[] buffer = new byte[2048];
 				int len = audioRecord.read(buffer, 0, buffer.length);
-				System.out.println(len);
 				if (0 < len) {
 					mNative.fireAudio(buffer, len);
 				}
 			}
+			buffer = null;
+			audioRecord = null;
 		}
 	}
-
 }

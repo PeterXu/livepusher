@@ -12,7 +12,7 @@ public class PusherNative {
 
 	}
 
-	public void setLiveStateChangeListener(LiveStateListener listener) {
+	public void setLiveStateListener(LiveStateListener listener) {
 		mListener = listener;
 	}
 

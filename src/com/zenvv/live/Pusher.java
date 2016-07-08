@@ -12,7 +12,7 @@ public abstract class Pusher {
 		mNative = pusherNative;
 	}
 
-	public void setLiveStateChangeListener(LiveStateListener listener) {
+	public void setLiveStateListener(LiveStateListener listener) {
 		mListener = listener;
 	}
 

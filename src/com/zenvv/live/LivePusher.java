@@ -6,14 +6,16 @@ import android.view.SurfaceHolder;
 import com.zenvv.live.jni.PusherNative;
 
 public class LivePusher {
-
 	private final static String TAG = "LivePusher";
+	
 	private VideoParam videoParam;
 	private AudioParam audioParam;
-	private VideoPusher videoPusher;
+	
 	private PusherNative mNative;
+	private VideoPusher videoPusher;
 	private AudioPusher audioPusher;
 	private LiveStateListener mListener;
+	
 	private Activity mActivity;
 
 	static {
@@ -30,11 +32,12 @@ public class LivePusher {
 
 	public void prepare(SurfaceHolder surfaceHolder) {
 		surfaceHolder.setType(SurfaceHolder.SURFACE_TYPE_PUSH_BUFFERS);
-		videoPusher = new VideoPusher(mActivity, surfaceHolder, videoParam,
-				mNative);
+		
+		videoPusher = new VideoPusher(mActivity, surfaceHolder, videoParam, mNative);
 		audioPusher = new AudioPusher(audioParam, mNative);
-		videoPusher.setLiveStateChangeListener(mListener);
-		audioPusher.setLiveStateChangeListener(mListener);
+		
+		videoPusher.setLiveStateListener(mListener);
+		audioPusher.setLiveStateListener(mListener);
 	}
 
 	public void startPusher(String url) {
@@ -56,9 +59,11 @@ public class LivePusher {
 	public void relase() {
 		mActivity = null;
 		stopPusher();
-		videoPusher.setLiveStateChangeListener(null);
-		audioPusher.setLiveStateChangeListener(null);
-		mNative.setLiveStateChangeListener(null);
+		
+		videoPusher.setLiveStateListener(null);
+		audioPusher.setLiveStateListener(null);
+		mNative.setLiveStateListener(null);
+		
 		videoPusher.release();
 		audioPusher.release();
 		mNative.release();
@@ -66,14 +71,14 @@ public class LivePusher {
 
 	public void setLiveStateChangeListener(LiveStateListener listener) {
 		mListener = listener;
-		mNative.setLiveStateChangeListener(listener);
+		mNative.setLiveStateListener(listener);
+		
 		if (null != videoPusher) {
-			videoPusher.setLiveStateChangeListener(listener);
+			videoPusher.setLiveStateListener(listener);
 		}
+		
 		if (null != audioPusher) {
-			audioPusher.setLiveStateChangeListener(listener);
+			audioPusher.setLiveStateListener(listener);
 		}
-
 	}
-
 }
