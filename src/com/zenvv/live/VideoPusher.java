@@ -18,16 +18,18 @@ import android.view.SurfaceHolder.Callback;
 import com.zenvv.live.jni.PusherNative;
 
 public class VideoPusher extends Pusher implements Callback, PreviewCallback {
-
 	private final static String TAG = "VideoPusher";
+	
 	private boolean mPreviewRunning;
 	private Camera mCamera;
 	private SurfaceHolder mHolder;
 	private VideoParam mParam;
-	private byte[] buffer;
-	private byte[] raw;
+	
+	private byte[] mBuffer;
+	private byte[] mRaw;
 	private Activity mActivity;
-	private int screen;
+	
+	private int mScreen;
 	private final static int SCREEN_PORTRAIT = 0;
 	private final static int SCREEN_LANDSCAPE_LEFT = 90;
 	private final static int SCREEN_LANDSCAPE_RIGHT = 270;
@@ -35,6 +37,7 @@ public class VideoPusher extends Pusher implements Callback, PreviewCallback {
 	public VideoPusher(Activity activity, SurfaceHolder surfaceHolder,
 			VideoParam param, PusherNative pusherNative) {
 		super(pusherNative);
+		
 		mActivity = activity;
 		mParam = param;
 		mHolder = surfaceHolder;
@@ -65,6 +68,7 @@ public class VideoPusher extends Pusher implements Callback, PreviewCallback {
 		} else {
 			mParam.setCameraId(CameraInfo.CAMERA_FACING_BACK);
 		}
+		
 		stopPreview();
 		startPreview();
 	}
@@ -92,9 +96,10 @@ public class VideoPusher extends Pusher implements Callback, PreviewCallback {
 			setPreviewFpsRange(parameters);
 			setPreviewOrientation(parameters);
 			mCamera.setParameters(parameters);
-			buffer = new byte[mParam.getWidth() * mParam.getHeight() * 3 / 2];
-			raw = new byte[mParam.getWidth() * mParam.getHeight() * 3 / 2];
-			mCamera.addCallbackBuffer(buffer);
+			
+			mBuffer = new byte[mParam.getWidth() * mParam.getHeight() * 3 / 2];
+			mRaw = new byte[mParam.getWidth() * mParam.getHeight() * 3 / 2];
+			mCamera.addCallbackBuffer(mBuffer);
 			mCamera.setPreviewCallbackWithBuffer(this);
 			mCamera.setPreviewDisplay(mHolder);
 			mCamera.startPreview();
@@ -113,24 +118,25 @@ public class VideoPusher extends Pusher implements Callback, PreviewCallback {
 		for (Integer integer : supportedPreviewFormats) {
 			System.out.println("setPreviewSize fmt:" + integer);
 		}
-		List<Size> supportedPreviewSizes = parameters
-				.getSupportedPreviewSizes();
+		
+		List<Size> supportedPreviewSizes = parameters.getSupportedPreviewSizes();
 		Size size = supportedPreviewSizes.get(0);
 		Log.d(TAG, "setPreviewSize size: " + size.width + "x" + size.height);
-		int m = Math.abs(size.height * size.width - mParam.getHeight()
-				* mParam.getWidth());
+		
+		int m = Math.abs(size.height * size.width - mParam.getHeight() * mParam.getWidth());
 		supportedPreviewSizes.remove(0);
+		
 		Iterator<Size> iterator = supportedPreviewSizes.iterator();
 		while (iterator.hasNext()) {
 			Size next = iterator.next();
 			Log.d(TAG, "setPreviewSize next: " + next.width + "x" + next.height);
-			int n = Math.abs(next.height * next.width - mParam.getHeight()
-					* mParam.getWidth());
+			int n = Math.abs(next.height * next.width - mParam.getHeight() * mParam.getWidth());
 			if (n < m) {
 				m = n;
 				size = next;
 			}
 		}
+		
 		mParam.setHeight(size.height);
 		mParam.setWidth(size.width);
 		parameters.setPreviewSize(mParam.getWidth(), mParam.getHeight());
@@ -146,35 +152,36 @@ public class VideoPusher extends Pusher implements Callback, PreviewCallback {
 	private void setPreviewOrientation(Camera.Parameters parameters) {
 		CameraInfo info = new CameraInfo();
 		Camera.getCameraInfo(mParam.getCameraId(), info);
-		int rotation = mActivity.getWindowManager().getDefaultDisplay()
-				.getRotation();
-		screen = 0;
+		
+		int rotation = mActivity.getWindowManager().getDefaultDisplay().getRotation();
+		mScreen = 0;
 		switch (rotation) {
 		case Surface.ROTATION_0:
-			screen = SCREEN_PORTRAIT;
+			mScreen = SCREEN_PORTRAIT;
 			mNative.setVideoOptions(mParam.getHeight(), mParam.getWidth(),
 					mParam.getBitrate(), mParam.getFps());
 			break;
 		case Surface.ROTATION_90: 
-			screen = SCREEN_LANDSCAPE_LEFT;
+			mScreen = SCREEN_LANDSCAPE_LEFT;
 			mNative.setVideoOptions(mParam.getWidth(), mParam.getHeight(),
 					mParam.getBitrate(), mParam.getFps());
 			break;
 		case Surface.ROTATION_180:
-			screen = 180;
+			mScreen = 180;
 			break;
 		case Surface.ROTATION_270:
-			screen = SCREEN_LANDSCAPE_RIGHT;
+			mScreen = SCREEN_LANDSCAPE_RIGHT;
 			mNative.setVideoOptions(mParam.getWidth(), mParam.getHeight(),
 					mParam.getBitrate(), mParam.getFps());
 			break;
 		}
+		
 		int result;
 		if (info.facing == Camera.CameraInfo.CAMERA_FACING_FRONT) {
-			result = (info.orientation + screen) % 360;
+			result = (info.orientation + mScreen) % 360;
 			result = (360 - result) % 360; // compensate the mirror
 		} else { // back-facing
-			result = (info.orientation - screen + 360) % 360;
+			result = (info.orientation - mScreen + 360) % 360;
 		}
 		mCamera.setDisplayOrientation(result);
 
@@ -195,7 +202,7 @@ public class VideoPusher extends Pusher implements Callback, PreviewCallback {
 
 	@Override
 	public void surfaceCreated(SurfaceHolder holder) {
-
+		mHolder = holder;
 	}
 
 	@Override
@@ -214,20 +221,24 @@ public class VideoPusher extends Pusher implements Callback, PreviewCallback {
 	@Override
 	public void onPreviewFrame(byte[] data, Camera camera) {
 		if (mPusherRuning) {
-			switch (screen) {
+			byte[] pData = data;
+			switch (mScreen) {
 			case SCREEN_PORTRAIT:
 				portraitData2Raw(data);
+				pData = mRaw;
 				break;
 			case SCREEN_LANDSCAPE_LEFT:
-				raw = data;
+				pData = data;
 				break;
 			case SCREEN_LANDSCAPE_RIGHT:
 				landscapeData2Raw(data);
+				pData = mRaw;
 				break;
 			}
-			mNative.fireVideo(raw);
+			mNative.fireVideo(pData);
+			pData = null;
 		}
-		camera.addCallbackBuffer(buffer);
+		camera.addCallbackBuffer(mBuffer);
 	}
 
 	private void landscapeData2Raw(byte[] data) {
@@ -236,9 +247,10 @@ public class VideoPusher extends Pusher implements Callback, PreviewCallback {
 		int k = 0;
 		// y => raw
 		for (int i = y_len - 1; i > -1; i--) {
-			raw[k] = data[i];
+			mRaw[k] = data[i];
 			k++;
 		}
+		
 		// System.arraycopy(data, y_len, raw, y_len, uv_len);
 		// v1 u1 v2 u2
 		// v3 u3 v4 u4
@@ -249,8 +261,8 @@ public class VideoPusher extends Pusher implements Callback, PreviewCallback {
 		int uv_len = y_len >> 2; // 4:1:1
 		for (int i = 0; i < uv_len; i++) {
 			int pos = i << 1;
-			raw[y_len + i * 2] = data[maxpos - pos - 1];
-			raw[y_len + i * 2 + 1] = data[maxpos - pos];
+			mRaw[y_len + i * 2] = data[maxpos - pos - 1];
+			mRaw[y_len + i * 2 + 1] = data[maxpos - pos];
 		}
 	}
 
@@ -260,36 +272,41 @@ public class VideoPusher extends Pusher implements Callback, PreviewCallback {
 		// raw = data;
 		// return;
 		// }
-		int width = mParam.getWidth(), height = mParam.getHeight();
+		
+		int width = mParam.getWidth(); 
+		int height = mParam.getHeight();
 		int y_len = width * height;
 		int uvHeight = height >> 1;
 		int k = 0;
+		
 		if (mParam.getCameraId() == CameraInfo.CAMERA_FACING_BACK) {
 			for (int j = 0; j < width; j++) {
 				for (int i = height - 1; i >= 0; i--) {
-					raw[k++] = data[width * i + j];
+					mRaw[k++] = data[width * i + j];
 				}
 			}
+			
 			for (int j = 0; j < width; j += 2) {
 				for (int i = uvHeight - 1; i >= 0; i--) {
-					raw[k++] = data[y_len + width * i + j];
-					raw[k++] = data[y_len + width * i + j + 1];
+					mRaw[k++] = data[y_len + width * i + j];
+					mRaw[k++] = data[y_len + width * i + j + 1];
 				}
 			}
 		} else {
 			for (int i = 0; i < width; i++) {
 				int nPos = width - 1;
 				for (int j = 0; j < height; j++) {
-					raw[k] = data[nPos - i];
+					mRaw[k] = data[nPos - i];
 					k++;
 					nPos += width;
 				}
 			}
+			
 			for (int i = 0; i < width; i += 2) {
 				int nPos = y_len + width - 1;
 				for (int j = 0; j < uvHeight; j++) {
-					raw[k] = data[nPos - i - 1];
-					raw[k + 1] = data[nPos - i];
+					mRaw[k] = data[nPos - i - 1];
+					mRaw[k + 1] = data[nPos - i];
 					k += 2;
 					nPos += width;
 				}
