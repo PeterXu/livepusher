@@ -5,11 +5,11 @@ import android.util.Log;
 import com.zenvv.live.LiveStateListener;
 
 public class PusherNative {
+	private final static String TAG = "PusherNative";
 
 	private LiveStateListener mListener;
 
 	public PusherNative() {
-
 	}
 
 	public void setLiveStateListener(LiveStateListener listener) {
@@ -17,22 +17,24 @@ public class PusherNative {
 	}
 
 	public void onPostNativeError(int code) {
-		Log.d("PusherNative", code + "");
+		Log.d(TAG, "onPostNativeError, code=" + code);
 		if (null != mListener) {
 			mListener.onErrorPusher(code);
 		}
 	}
 
 	public void onPostNativeState(int state) {
-		if (state == 100) {
-			mListener.onStartPusher();
-		} else if (state == 101) {
-			mListener.onStopPusher();
+		Log.d(TAG, "onPostNativeState, state=" + state);
+		if (null != mListener) {
+			if (state == 100) {
+				mListener.onStartPusher();
+			} else if (state == 101) {
+				mListener.onStopPusher();
+			}
 		}
 	}
 
-	public native void setVideoOptions(int width, int height, int bitrate,
-			int fps);
+	public native void setVideoOptions(int width, int height, int bitrate, int fps);
 
 	public native void setAudioOptions(int sampleRate, int channel);
 
