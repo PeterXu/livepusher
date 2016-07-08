@@ -13,6 +13,8 @@ bin/
 gen/
 libs/
 .settings/
+obj/
+.DS_Store
 
 # Gradle files
 .gradle/

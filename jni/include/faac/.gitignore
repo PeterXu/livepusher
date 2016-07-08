@@ -1,0 +1,12 @@
+*.la
+*.lo
+Makefile
+.libs
+.deps
+*.a
+libtool
+config.status
+autom4te.cache
+mpeg4ip_config.h
+config.h.in~
+frontend/faac
