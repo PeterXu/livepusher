@@ -1,4 +1,4 @@
-package com.jutong.live.param;
+package com.zenvv.live;
 
 public class VideoParam {
 	private int width;

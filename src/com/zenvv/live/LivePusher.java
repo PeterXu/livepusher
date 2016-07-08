@@ -1,13 +1,9 @@
-package com.jutong.live;
+package com.zenvv.live;
 
 import android.app.Activity;
 import android.view.SurfaceHolder;
 
-import com.jutong.live.jni.PusherNative;
-import com.jutong.live.param.AudioParam;
-import com.jutong.live.param.VideoParam;
-import com.jutong.live.pusher.AudioPusher;
-import com.jutong.live.pusher.VideoPusher;
+import com.zenvv.live.jni.PusherNative;
 
 public class LivePusher {
 
@@ -17,7 +13,7 @@ public class LivePusher {
 	private VideoPusher videoPusher;
 	private PusherNative mNative;
 	private AudioPusher audioPusher;
-	private LiveStateChangeListener mListener;
+	private LiveStateListener mListener;
 	private Activity mActivity;
 
 	static {
@@ -68,7 +64,7 @@ public class LivePusher {
 		mNative.release();
 	}
 
-	public void setLiveStateChangeListener(LiveStateChangeListener listener) {
+	public void setLiveStateChangeListener(LiveStateListener listener) {
 		mListener = listener;
 		mNative.setLiveStateChangeListener(listener);
 		if (null != videoPusher) {

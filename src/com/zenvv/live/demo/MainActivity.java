@@ -1,9 +1,7 @@
-package com.jutong.live;
+package com.zenvv.live.demo;
 
-import android.annotation.TargetApi;
 import android.app.Activity;
 import android.hardware.Camera.CameraInfo;
-import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.util.Log;
@@ -15,10 +13,12 @@ import android.view.View.OnClickListener;
 import android.widget.Button;
 import android.widget.Toast;
 
+import com.zenvv.live.LivePusher;
+import com.zenvv.live.LiveStateListener;
 import com.zenvv.livepusher.R;
 
 public class MainActivity extends Activity implements OnClickListener,
-		Callback, LiveStateChangeListener {
+		Callback, LiveStateListener {
 
 	private Button button01;
 	private SurfaceView mSurfaceView;

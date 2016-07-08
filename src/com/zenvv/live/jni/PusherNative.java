@@ -1,18 +1,18 @@
-package com.jutong.live.jni;
+package com.zenvv.live.jni;
 
 import android.util.Log;
 
-import com.jutong.live.LiveStateChangeListener;
+import com.zenvv.live.LiveStateListener;
 
 public class PusherNative {
 
-	private LiveStateChangeListener mListener;
+	private LiveStateListener mListener;
 
 	public PusherNative() {
 
 	}
 
-	public void setLiveStateChangeListener(LiveStateChangeListener listener) {
+	public void setLiveStateChangeListener(LiveStateListener listener) {
 		mListener = listener;
 	}
 

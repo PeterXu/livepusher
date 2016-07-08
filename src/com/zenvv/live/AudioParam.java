@@ -1,4 +1,4 @@
-package com.jutong.live.param;
+package com.zenvv.live;
 
 public class AudioParam {
 	private int sampleRate = 44100;

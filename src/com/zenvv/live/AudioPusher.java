@@ -1,12 +1,11 @@
-package com.jutong.live.pusher;
+package com.zenvv.live;
 
 import android.media.AudioFormat;
 import android.media.AudioRecord;
 import android.media.MediaRecorder;
 import android.util.Log;
 
-import com.jutong.live.jni.PusherNative;
-import com.jutong.live.param.AudioParam;
+import com.zenvv.live.jni.PusherNative;
 
 public class AudioPusher extends Pusher {
 	private final static String TAG = "AudioPusher";
