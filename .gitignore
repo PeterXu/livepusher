@@ -7,7 +7,9 @@
 *.iml
 .idea/
 local.properties
+config.log
 
 
 .gradle/
 build/
+jniLibs/
