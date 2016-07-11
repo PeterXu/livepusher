@@ -3,7 +3,7 @@ package com.zenvv.live;
 public class AudioParam {
 	private int sampleRate = 44100;		//> HZ
 	private int channel = 1;
-	private int bitrate = 64 * 1024; 	//> bit/s
+	private int bitrate = 32 * 1024; 	//> bit/s
 
 	public AudioParam(int sampleRate, int channel, int bitrate) {
 		this.sampleRate = sampleRate;
