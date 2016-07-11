@@ -1,13 +1,13 @@
 #include <jni.h>
 #include <android/log.h>
+#include <stdio.h>
+#include <queue.h>
+#include <pthread.h>
+#include <cpu-features.h>
 
 #include "rtmp.h"
 #include "x264.h"
 #include "faac.h"
-#include <stdio.h>
-#include <queue.h>
-#include <pthread.h>
-// #include <sys/time.h>
 
 
 //#define DEBUG
@@ -421,12 +421,62 @@ static void x264_log_default2(void *p_unused, int i_level, const char *psz_fmt, 
 	}
 }
 
+void preset_x264_param(x264_param_t *param, video_enc_t *video) {
+	int threads = android_getCpuCount();
+    if (threads <= 0) threads = 1;
+    threads = 1;
+
+	x264_param_default_preset(param, "ultrafast", "zerolatency");
+
+	//param.pf_log = x264_log_default2;
+	param->i_level_idc = 52; 	// base_line: 5.2
+	param->i_level_idc = 51; 	// base_line: 5.2
+	param->i_csp = X264_CSP_I420;
+	param->i_width = video->width;
+	param->i_height = video->height;
+	param->i_bframe = 0;
+	param->b_repeat_headers = 1;
+	param->i_fps_num = video->fps;
+	param->i_fps_den = 1;
+	param->b_vfr_input = 0;
+	param->i_keyint_max = video->fps; //gop
+    param->i_keyint_min = X264_KEYINT_MIN_AUTO;
+	param->i_timebase_den = param->i_fps_num;
+	param->i_timebase_num = param->i_fps_den;
+	param->i_threads = threads;
+
+	param->rc.i_rc_method = X264_RC_ABR;
+	param->rc.i_bitrate = video->bitrate / 1000;
+	param->rc.i_vbv_max_bitrate = video->bitrate * 1.2 / 1000;
+	param->rc.i_vbv_buffer_size = video->bitrate / 1000;
+    param->rc.i_qp_max = 46;
+    param->rc.i_qp_min = 10;
+    param->rc.i_qp_step = 4;
+    param->rc.f_qcompress = 0.6;
+
+#if 0
+    param->analyse.i_trellis = 2;
+    param->analyse.i_subpel_refine = 8;
+    param->analyse.inter = X264_ANALYSE_I4x4|X264_ANALYSE_PSUB8x8;
+    param->analyse.b_mixed_references = 1;
+    param->analyse.f_psy_rd = 0.5;
+    param->vui.i_colmatrix = 8;
+#endif
+
+    param->i_bframe = 1;
+    param->b_cabac = 1;
+
+    // set profile
+	//x264_param_apply_profile(param, "baseline");
+	x264_param_apply_profile(param, "main");
+}
+
 void setVideoOptions(video_enc_t *video, jint width, jint height, jint bitrate, jint fps) {
 	LOGD("Video options: %dx%d, %dkb/s, %d", width, height, bitrate/1000, fps);
-	x264_param_t param;
 	if (video->handle) {
 		LOGD("Video encoder has been opened");
-		if (video->fps != fps || video->bitrate != bitrate || video->height != height || video->width != width) {
+		if (video->height != height || video->width != width ||
+            video->fps != fps || video->bitrate != bitrate) {
 			x264_encoder_close(video->handle);
 			video->handle = 0;
 			x264_free(video->pic_in);
@@ -436,35 +486,17 @@ void setVideoOptions(video_enc_t *video, jint width, jint height, jint bitrate, 
 		}
 	}
 
+    // save state
 	video->width = width;
 	video->height = height;
 	video->bitrate = bitrate;
 	video->fps = fps;
 	video->y_len = width * height;
 	video->u_v_len = video->y_len / 4;
-	x264_param_default_preset(&param, "ultrafast", "zerolatency");
 
-	//param.pf_log = x264_log_default2;
-	param.i_level_idc = 52; 	// base_line: 5.2
-	param.i_csp = X264_CSP_I420;
-	param.i_width = width;
-	param.i_height = height;
-	param.i_bframe = 0;
-	param.rc.i_rc_method = X264_RC_ABR;
-	param.rc.i_bitrate = bitrate / 1000;
-	param.rc.i_vbv_max_bitrate = bitrate / 1000 * 1.2;
-	param.rc.i_vbv_buffer_size = bitrate / 1000;
-	param.b_repeat_headers = 1;
-	param.i_fps_num = fps;
-	param.i_fps_den = 1;
-	param.b_vfr_input = 0;
-	param.i_keyint_max = fps * 2;
-	param.i_threads = 1;
-	param.i_timebase_den = param.i_fps_num;
-	param.i_timebase_num = param.i_fps_den;
-
-	//baseline
-	x264_param_apply_profile(&param, "baseline");
+    // set x264 param and open encoder
+	x264_param_t param;
+    preset_x264_param(&param, video);
 	LOGD("x264 param: %s", x264_param2string(&param,1));
 	video->handle = x264_encoder_open(&param);
 	if (!video->handle) {
@@ -475,7 +507,7 @@ void setVideoOptions(video_enc_t *video, jint width, jint height, jint bitrate, 
 
 	video->pic_in = malloc(sizeof(x264_picture_t));
 	video->pic_out = malloc(sizeof(x264_picture_t));
-	x264_picture_alloc(video->pic_in, X264_CSP_I420, video->width, video->height);
+	x264_picture_alloc(video->pic_in, X264_CSP_I420, width, height);
 }
 
 JNIEXPORT void JNICALL Java_com_zenvv_live_jni_PusherNative_setVideoOptions(

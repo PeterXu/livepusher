@@ -6,9 +6,12 @@
 *.class
 *.iml
 .idea/
+.xtags/
 local.properties
 config.log
 
+obj/
+objs/
 libs/
 .gradle/
 build/
