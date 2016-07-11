@@ -9,7 +9,7 @@
 local.properties
 config.log
 
-
+libs/
 .gradle/
 build/
 jniLibs/
