@@ -4,7 +4,7 @@
     <string name="app_name">LivePusher</string>
     <string name="hello_world">Hello world!</string>
     <string name="action_settings">Settings</string>
-    
+
     <string name="video_preview_failure">视频预览开始失败</string>
     <string name="audio_record_failure">音频录制失败</string>
     <string name="audio_config_failure">音频编码器配置失败</string>
@@ -20,7 +20,11 @@
     <string name="push_stream">推流</string>
     <string name="switch_camera">切换</string>
     <string name="live_url">直播地址</string>
+
+    <string name="live_testing">测试</string>
     <string name="live_title">直播主题</string>
-    <string name="live_channel">直播频道名字</string>
+    <string name="invalid_title">请先设置频道主题</string>
+    <string name="live_channel">直播频道名字(英文字母)</string>
+    <string name="invalid_channel">请先设置频道名(英文字母)</string>
 
 </resources>

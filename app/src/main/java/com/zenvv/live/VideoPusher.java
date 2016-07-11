@@ -150,33 +150,32 @@ public class VideoPusher extends Pusher implements Callback, PreviewCallback {
 	}
 
 	private void setPreviewOrientation(Camera.Parameters parameters) {
-		CameraInfo info = new CameraInfo();
-		Camera.getCameraInfo(mParam.getCameraId(), info);
-		
-		int rotation = mActivity.getWindowManager().getDefaultDisplay().getRotation();
 		mScreen = 0;
+
+		int rotation = mActivity.getWindowManager().getDefaultDisplay().getRotation();
 		switch (rotation) {
 		case Surface.ROTATION_0:
 			mScreen = SCREEN_PORTRAIT;
-			mNative.setVideoOptions(mParam.getHeight(), mParam.getWidth(),
-					mParam.getBitrate(), mParam.getFps());
 			break;
 		case Surface.ROTATION_90: 
 			mScreen = SCREEN_LANDSCAPE_LEFT;
-			mNative.setVideoOptions(mParam.getWidth(), mParam.getHeight(),
-					mParam.getBitrate(), mParam.getFps());
 			break;
 		case Surface.ROTATION_180:
 			mScreen = 180;
 			break;
 		case Surface.ROTATION_270:
 			mScreen = SCREEN_LANDSCAPE_RIGHT;
+			break;
+		}
+
+		if (rotation != Surface.ROTATION_180) {
 			mNative.setVideoOptions(mParam.getWidth(), mParam.getHeight(),
 					mParam.getBitrate(), mParam.getFps());
-			break;
 		}
 		
 		int result;
+		CameraInfo info = new CameraInfo();
+		Camera.getCameraInfo(mParam.getCameraId(), info);
 		if (info.facing == Camera.CameraInfo.CAMERA_FACING_FRONT) {
 			result = (info.orientation + mScreen) % 360;
 			result = (360 - result) % 360; // compensate the mirror

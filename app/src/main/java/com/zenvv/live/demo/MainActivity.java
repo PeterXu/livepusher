@@ -11,6 +11,8 @@ import android.view.SurfaceView;
 import android.view.View;
 import android.view.View.OnClickListener;
 import android.widget.Button;
+import android.widget.EditText;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import com.zenvv.live.LivePusher;
@@ -26,28 +28,31 @@ public class MainActivity extends Activity implements OnClickListener,
 	private SurfaceHolder mSurfaceHolder;
 	private boolean isStart;
 	private LivePusher livePusher;
+
+	private String mUrl;
+	private String mTitle;
 	
 	private final Handler mHandler = new Handler() {
 		public void handleMessage(android.os.Message msg) {
 			switch (msg.what) {
 			case -100:
-				Toast.makeText(MainActivity.this, R.string.video_preview_failure, 0).show();
+				Toast.makeText(MainActivity.this, R.string.video_preview_failure, Toast.LENGTH_SHORT).show();
 				livePusher.stopPusher();
 				break;
 			case -101:
-				Toast.makeText(MainActivity.this, R.string.audio_record_failure, 0).show();
+				Toast.makeText(MainActivity.this, R.string.audio_record_failure, Toast.LENGTH_SHORT).show();
 				livePusher.stopPusher();
 				break;
 			case -102:
-				Toast.makeText(MainActivity.this, R.string.audio_config_failure, 0).show();
+				Toast.makeText(MainActivity.this, R.string.audio_config_failure, Toast.LENGTH_SHORT).show();
 				livePusher.stopPusher();
 				break;
 			case -103:
-				Toast.makeText(MainActivity.this, R.string.video_config_failure, 0).show();
+				Toast.makeText(MainActivity.this, R.string.video_config_failure, Toast.LENGTH_SHORT).show();
 				livePusher.stopPusher();
 				break;
 			case -104:
-				Toast.makeText(MainActivity.this, R.string.net_streaming_failure, 0).show();
+				Toast.makeText(MainActivity.this, R.string.net_streaming_failure, Toast.LENGTH_SHORT).show();
 				livePusher.stopPusher();
 				break;
 			}
@@ -75,8 +80,11 @@ public class MainActivity extends Activity implements OnClickListener,
 		mSurfaceView = (SurfaceView) this.findViewById(R.id.surface);
 		mSurfaceHolder = mSurfaceView.getHolder();
 		mSurfaceHolder.addCallback(this);
+
+		EditText text1 = (EditText)findViewById(R.id.live_title);
+		text1.setText(R.string.live_testing);
 		
-		livePusher = new LivePusher(this, 640, 480, 768*1024, 15,
+		livePusher = new LivePusher(this, 640, 480, 768*1024, 20,
 				CameraInfo.CAMERA_FACING_FRONT);
 		livePusher.setLiveStateListener(this);
 		livePusher.prepare(mSurfaceHolder);
@@ -96,6 +104,12 @@ public class MainActivity extends Activity implements OnClickListener,
 
 	@Override
 	public void onClick(View v) {
+		checkUserInput();
+
+		if (mUrl == null || mUrl.isEmpty()) {
+			return;
+		}
+
 		if (isStart) {
 			mStartBtn.setText(R.string.start);
 			isStart = false;
@@ -103,9 +117,31 @@ public class MainActivity extends Activity implements OnClickListener,
 		} else {
 			mStartBtn.setText(R.string.stop);
 			isStart = true;
-			livePusher.startPusher("rtmp://10.11.40.4/app/live");
+			livePusher.startPusher(mUrl);
 
 		}
+	}
+
+	public void checkUserInput() {
+		TextView tv = (TextView)findViewById(R.id.live_url);
+		tv.setText("");
+
+		EditText text1 = (EditText)findViewById(R.id.live_title);
+		mTitle = text1.getText().toString();
+		if (mTitle == null || mTitle.isEmpty()) {
+			Toast.makeText(MainActivity.this, R.string.invalid_title, Toast.LENGTH_SHORT).show();
+			return;
+		}
+
+		mUrl = "";
+		EditText text2 = (EditText)findViewById(R.id.live_channel);
+		if (text2.getText().length() < 4) {
+			Toast.makeText(MainActivity.this, R.string.invalid_channel, Toast.LENGTH_SHORT).show();
+			return;
+		}
+
+		mUrl = "rtmp://media.sportsdata.cn/app/" + text2.getText().toString();
+		tv.setText(mUrl);
 	}
 
 	@Override
