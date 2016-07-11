@@ -19,16 +19,17 @@ import com.zenvv.livepusher.R;
 
 public class MainActivity extends Activity implements OnClickListener,
 		Callback, LiveStateListener {
-
-	private Button button01;
+	private final static String TAG = "MainActivity";
+	
+	private Button mStartBtn;
 	private SurfaceView mSurfaceView;
 	private SurfaceHolder mSurfaceHolder;
 	private boolean isStart;
 	private LivePusher livePusher;
-	private Handler mHandler = new Handler() {
+	
+	private final Handler mHandler = new Handler() {
 		public void handleMessage(android.os.Message msg) {
 			switch (msg.what) {
-
 			case -100:
 				Toast.makeText(MainActivity.this, R.string.video_preview_failure, 0).show();
 				livePusher.stopPusher();
@@ -50,7 +51,7 @@ public class MainActivity extends Activity implements OnClickListener,
 				livePusher.stopPusher();
 				break;
 			}
-			button01.setText(R.string.push_stream);
+			mStartBtn.setText(R.string.stop);
 			isStart = false;
 		};
 	};
@@ -58,25 +59,27 @@ public class MainActivity extends Activity implements OnClickListener,
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
+		
 		setContentView(R.layout.activity_main);
-		button01 = (Button) findViewById(R.id.button_first);
-		button01.setOnClickListener(this);
-		findViewById(R.id.button_take).setOnClickListener(
+		
+		mStartBtn = (Button) findViewById(R.id.button_start);
+		mStartBtn.setOnClickListener(this);
+		findViewById(R.id.button_switch).setOnClickListener(
 				new OnClickListener() {
-
 					@Override
 					public void onClick(View v) {
 						livePusher.switchCamera();
 					}
 				});
+		
 		mSurfaceView = (SurfaceView) this.findViewById(R.id.surface);
 		mSurfaceHolder = mSurfaceView.getHolder();
 		mSurfaceHolder.addCallback(this);
-		livePusher = new LivePusher(this, 960, 720, 1024000, 15,
+		
+		livePusher = new LivePusher(this, 640, 480, 768*1024, 15,
 				CameraInfo.CAMERA_FACING_FRONT);
-		livePusher.setLiveStateChangeListener(this);
+		livePusher.setLiveStateListener(this);
 		livePusher.prepare(mSurfaceHolder);
-
 	}
 
 	// @Override
@@ -94,11 +97,11 @@ public class MainActivity extends Activity implements OnClickListener,
 	@Override
 	public void onClick(View v) {
 		if (isStart) {
-			button01.setText(R.string.start);
+			mStartBtn.setText(R.string.start);
 			isStart = false;
 			livePusher.stopPusher();
 		} else {
-			button01.setText(R.string.stop);
+			mStartBtn.setText(R.string.stop);
 			isStart = true;
 			livePusher.startPusher("rtmp://10.11.40.4/app/live");
 
@@ -107,18 +110,17 @@ public class MainActivity extends Activity implements OnClickListener,
 
 	@Override
 	public void surfaceCreated(SurfaceHolder holder) {
-		System.out.println("MAIN: CREATE");
+		Log.d(TAG, "surfaceCreated");
 	}
 
 	@Override
-	public void surfaceChanged(SurfaceHolder holder, int format, int width,
-			int height) {
-		System.out.println("MAIN: CHANGE");
+	public void surfaceChanged(SurfaceHolder holder, int format, int width, int height) {
+		Log.d(TAG, "surfaceChanged, width=" + width + ", height=" + height);
 	}
 
 	@Override
 	public void surfaceDestroyed(SurfaceHolder holder) {
-		System.out.println("MAIN: DESTORY");
+		Log.d(TAG, "surfaceDestroyed");
 	}
 
 	/**
@@ -126,7 +128,7 @@ public class MainActivity extends Activity implements OnClickListener,
 	 */
 	@Override
 	public void onErrorPusher(int code) {
-		System.out.println("code:" + code);
+		Log.d(TAG, "onErrorPusher code:" + code);
 		mHandler.sendEmptyMessage(code);
 	}
 
@@ -135,7 +137,7 @@ public class MainActivity extends Activity implements OnClickListener,
 	 */
 	@Override
 	public void onStartPusher() {
-		Log.d("MainActivity", "start push streaming");
+		Log.d(TAG, "start push streaming");
 	}
 
 	/**
@@ -143,7 +145,7 @@ public class MainActivity extends Activity implements OnClickListener,
 	 */
 	@Override
 	public void onStopPusher() {
-		Log.d("MainActivity", "stop push streaming");
+		Log.d(TAG, "stop push streaming");
 	}
 
 }

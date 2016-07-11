@@ -69,7 +69,7 @@ public class LivePusher {
 		mNative.release();
 	}
 
-	public void setLiveStateChangeListener(LiveStateListener listener) {
+	public void setLiveStateListener(LiveStateListener listener) {
 		mListener = listener;
 		mNative.setLiveStateListener(listener);
 		
