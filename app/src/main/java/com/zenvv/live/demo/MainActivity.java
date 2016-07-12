@@ -12,9 +12,11 @@ import android.view.View;
 import android.view.View.OnClickListener;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.RelativeLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import com.melnykov.fab.FloatingActionButton;
 import com.zenvv.live.LivePusher;
 import com.zenvv.live.LiveStateListener;
 import com.zenvv.livepusher.R;
@@ -22,7 +24,10 @@ import com.zenvv.livepusher.R;
 public class MainActivity extends Activity implements OnClickListener,
 		Callback, LiveStateListener {
 	private final static String TAG = "MainActivity";
-	
+
+	private final static String URI = "rtmp://media.sportsdata.cn/app/";
+	//private final static String URI = "http://media.sportsdata.cn:8936/app/";
+
 	private Button mStartBtn;
 	private SurfaceView mSurfaceView;
 	private SurfaceHolder mSurfaceHolder;
@@ -31,6 +36,9 @@ public class MainActivity extends Activity implements OnClickListener,
 
 	private String mUrl;
 	private String mTitle;
+
+	private boolean mShowCtrl = false;
+	private RelativeLayout mFloatCtrl;
 	
 	private final Handler mHandler = new Handler() {
 		public void handleMessage(android.os.Message msg) {
@@ -83,6 +91,11 @@ public class MainActivity extends Activity implements OnClickListener,
 
 		EditText text1 = (EditText)findViewById(R.id.live_title);
 		text1.setText(R.string.live_testing);
+
+		mFloatCtrl = (RelativeLayout) findViewById(R.id.float_ctrl);
+		if (!mShowCtrl) {
+			mFloatCtrl.setVisibility(View.INVISIBLE);
+		}
 		
 		livePusher = new LivePusher(this, 640, 480, 768*1024, 20,
 				CameraInfo.CAMERA_FACING_FRONT);
@@ -135,13 +148,24 @@ public class MainActivity extends Activity implements OnClickListener,
 
 		mUrl = "";
 		EditText text2 = (EditText)findViewById(R.id.live_channel);
-		if (text2.getText().length() < 4) {
+		String channel = text2.getText().toString();
+		if (channel == null || channel.length() < 4) {
 			Toast.makeText(MainActivity.this, R.string.invalid_channel, Toast.LENGTH_SHORT).show();
 			return;
 		}
 
-		mUrl = "rtmp://media.sportsdata.cn/app/" + text2.getText().toString();
+		mUrl = URI + channel;
 		tv.setText(mUrl);
+	}
+
+	public void onClickFloatingActionButton(View view) {
+		if (mShowCtrl) {
+			mFloatCtrl.setVisibility(View.INVISIBLE);
+			mShowCtrl = false;
+		}else {
+			mFloatCtrl.setVisibility(View.VISIBLE);
+			mShowCtrl = true;
+		}
 	}
 
 	@Override
