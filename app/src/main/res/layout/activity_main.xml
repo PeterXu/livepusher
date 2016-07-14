@@ -62,6 +62,7 @@
 	            android:id="@+id/button_switch"
 	            android:layout_width="wrap_content"
 	            android:layout_height="match_parent"
+				android:onClick="onClickSwitch"
 	            android:text="@+string/switch_camera" >
 	        </Button>
 	        
@@ -86,6 +87,7 @@
 	            android:id="@+id/button_start"
 	            android:layout_width="wrap_content"
 	            android:layout_height="match_parent"
+				android:onClick="onClickStart"
 	            android:text="@+string/start" >
 	            <requestFocus />
 	        </Button>
@@ -100,11 +102,11 @@
 		android:layout_gravity="bottom|right"
 		android:layout_margin="16dp"
 		android:src="@drawable/ic_action_content"
+		android:onClick="onClickFloatingActionButton"
         fab:fab_colorNormal="@color/primary"
         fab:fab_colorPressed="@color/accent_pressed"
         fab:fab_colorRipple="@color/ripple"
         fab:fab_shadow="false"
-        android:onClick="onClickFloatingActionButton"
         />
 
 

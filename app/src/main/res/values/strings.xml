@@ -5,11 +5,12 @@
     <string name="hello_world">Hello world!</string>
     <string name="action_settings">Settings</string>
 
-    <string name="video_preview_failure">视频预览开始失败</string>
-    <string name="audio_record_failure">音频录制失败</string>
-    <string name="audio_config_failure">音频编码器配置失败</string>
-    <string name="video_config_failure">视频频编码器配置失败</string>
-    <string name="net_streaming_failure">流媒体服务器/网络等问题</string>
+    <string name="e_video_preview">视频预览错误</string>
+    <string name="e_audio_record">音频录制错误</string>
+
+    <string name="e_audio_encoder">音频编码器错误</string>
+    <string name="e_video_encoder">视频编码器错误</string>
+    <string name="e_streaming_failure">媒体流/网络等问题</string>
     
     <string name="start">开始</string>
     <string name="stop">停止</string>

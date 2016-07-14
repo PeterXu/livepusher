@@ -25,7 +25,7 @@ public class AudioPusher extends Pusher {
 		minBufferSize = AudioRecord.getMinBufferSize(mParam.getSampleRate(), channel, pcmBits);
 		audioRecord = new AudioRecord(MediaRecorder.AudioSource.MIC,
 				mParam.getSampleRate(), channel, pcmBits, minBufferSize);
-		mNative.setAudioOptions(mParam.getSampleRate(), mParam.getChannel());
+		mNative.setAudioOptions(mParam.getSampleRate(), mParam.getChannel(), mParam.getBitrate());
 		Log.d(TAG, "audio input:" + mNative.getInputSamples());
 	}
 

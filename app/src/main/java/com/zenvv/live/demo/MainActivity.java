@@ -21,16 +21,15 @@ import com.zenvv.live.LivePusher;
 import com.zenvv.live.LiveStateListener;
 import com.zenvv.livepusher.R;
 
-public class MainActivity extends Activity implements OnClickListener,
+public class MainActivity extends Activity implements
 		Callback, LiveStateListener {
 	private final static String TAG = "MainActivity";
 
-	private final static String URI = "rtmp://media.sportsdata.cn/app/";
-	//private final static String URI = "http://media.sportsdata.cn:8936/app/";
+	private final static String URI = "rtmp://v.sportsdata.cn/app/";
+	//private final static String URI = "http://v.sportsdata.cn/app/";
 
 	private Button mStartBtn;
-	private SurfaceView mSurfaceView;
-	private SurfaceHolder mSurfaceHolder;
+	private SurfaceHolder mHolder;
 	private boolean isStart;
 	private LivePusher livePusher;
 
@@ -42,30 +41,26 @@ public class MainActivity extends Activity implements OnClickListener,
 	
 	private final Handler mHandler = new Handler() {
 		public void handleMessage(android.os.Message msg) {
+			int msgId = 0;
 			switch (msg.what) {
-			case -100:
-				Toast.makeText(MainActivity.this, R.string.video_preview_failure, Toast.LENGTH_SHORT).show();
-				livePusher.stopPusher();
-				break;
-			case -101:
-				Toast.makeText(MainActivity.this, R.string.audio_record_failure, Toast.LENGTH_SHORT).show();
-				livePusher.stopPusher();
-				break;
-			case -102:
-				Toast.makeText(MainActivity.this, R.string.audio_config_failure, Toast.LENGTH_SHORT).show();
-				livePusher.stopPusher();
-				break;
-			case -103:
-				Toast.makeText(MainActivity.this, R.string.video_config_failure, Toast.LENGTH_SHORT).show();
-				livePusher.stopPusher();
-				break;
-			case -104:
-				Toast.makeText(MainActivity.this, R.string.net_streaming_failure, Toast.LENGTH_SHORT).show();
-				livePusher.stopPusher();
-				break;
+				case -100:	msgId = R.string.e_video_preview; break;
+				case -101:	msgId = R.string.e_audio_record; break;
+				case -102:	msgId = R.string.e_audio_encoder; break;
+				case -103:	msgId = R.string.e_video_encoder; break;
+				case -104:
+				case -105:
+				case -106:
+				case -107:
+				case -108: msgId = R.string.e_streaming_failure; break;
+				default:
+					break;
 			}
-			mStartBtn.setText(R.string.stop);
-			isStart = false;
+
+			if (msgId > 0) {
+                String error = getString(msgId) + ", code=" + msg.what;
+				Toast.makeText(MainActivity.this, error, Toast.LENGTH_SHORT).show();
+				checkStatus(true);
+			}
 		};
 	};
 
@@ -76,18 +71,10 @@ public class MainActivity extends Activity implements OnClickListener,
 		setContentView(R.layout.activity_main);
 		
 		mStartBtn = (Button) findViewById(R.id.button_start);
-		mStartBtn.setOnClickListener(this);
-		findViewById(R.id.button_switch).setOnClickListener(
-				new OnClickListener() {
-					@Override
-					public void onClick(View v) {
-						livePusher.switchCamera();
-					}
-				});
-		
-		mSurfaceView = (SurfaceView) this.findViewById(R.id.surface);
-		mSurfaceHolder = mSurfaceView.getHolder();
-		mSurfaceHolder.addCallback(this);
+
+		SurfaceView surface = (SurfaceView) this.findViewById(R.id.surface);
+		mHolder = surface.getHolder();
+		mHolder.addCallback(this);
 
 		EditText text1 = (EditText)findViewById(R.id.live_title);
 		text1.setText(R.string.live_testing);
@@ -97,10 +84,9 @@ public class MainActivity extends Activity implements OnClickListener,
 			mFloatCtrl.setVisibility(View.INVISIBLE);
 		}
 		
-		livePusher = new LivePusher(this, 640, 480, 768*1024, 20,
-				CameraInfo.CAMERA_FACING_FRONT);
+		livePusher = new LivePusher(this, 640, 480, 768*1024, 20, CameraInfo.CAMERA_FACING_FRONT);
 		livePusher.setLiveStateListener(this);
-		livePusher.prepare(mSurfaceHolder);
+		livePusher.prepare(mHolder);
 	}
 
 	// @Override
@@ -115,23 +101,15 @@ public class MainActivity extends Activity implements OnClickListener,
 		livePusher.relase();
 	}
 
-	@Override
-	public void onClick(View v) {
-		checkUserInput();
-
-		if (mUrl == null || mUrl.isEmpty()) {
-			return;
-		}
-
-		if (isStart) {
+	public void checkStatus(boolean forceStopped) {
+		if (forceStopped || isStart) {
 			mStartBtn.setText(R.string.start);
 			isStart = false;
 			livePusher.stopPusher();
-		} else {
+		}else {
 			mStartBtn.setText(R.string.stop);
 			isStart = true;
 			livePusher.startPusher(mUrl);
-
 		}
 	}
 
@@ -156,6 +134,18 @@ public class MainActivity extends Activity implements OnClickListener,
 
 		mUrl = URI + channel;
 		tv.setText(mUrl);
+	}
+
+	public void onClickStart(View v) {
+		checkUserInput();
+
+		if (mUrl != null && !mUrl.isEmpty()) {
+            checkStatus(false);
+        }
+	}
+
+	public void onClickSwitch(View view) {
+		livePusher.switchCamera();
 	}
 
 	public void onClickFloatingActionButton(View view) {
@@ -192,17 +182,11 @@ public class MainActivity extends Activity implements OnClickListener,
 		mHandler.sendEmptyMessage(code);
 	}
 
-	/**
-	 * may run in child-thread
-	 */
 	@Override
 	public void onStartPusher() {
 		Log.d(TAG, "start push streaming");
 	}
 
-	/**
-	 * may run in child-thread
-	 */
 	@Override
 	public void onStopPusher() {
 		Log.d(TAG, "stop push streaming");

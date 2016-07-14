@@ -32,6 +32,7 @@ public class VideoPusher extends Pusher implements Callback, PreviewCallback {
 	private int mScreen;
 	private final static int SCREEN_PORTRAIT = 0;
 	private final static int SCREEN_LANDSCAPE_LEFT = 90;
+    private final static int SCREEN_PORTRAIT_REVERSE = 180;
 	private final static int SCREEN_LANDSCAPE_RIGHT = 270;
 
 	public VideoPusher(Activity activity, SurfaceHolder surfaceHolder,
@@ -150,12 +151,14 @@ public class VideoPusher extends Pusher implements Callback, PreviewCallback {
 	}
 
 	private void setPreviewOrientation(Camera.Parameters parameters) {
-		mScreen = 0;
-
+        int width = mParam.getWidth();
+        int height = mParam.getHeight();
 		int rotation = mActivity.getWindowManager().getDefaultDisplay().getRotation();
 		switch (rotation) {
 		case Surface.ROTATION_0:
 			mScreen = SCREEN_PORTRAIT;
+            width = mParam.getHeight();
+            height = mParam.getWidth();
 			break;
 		case Surface.ROTATION_90: 
 			mScreen = SCREEN_LANDSCAPE_LEFT;
@@ -166,12 +169,13 @@ public class VideoPusher extends Pusher implements Callback, PreviewCallback {
 		case Surface.ROTATION_270:
 			mScreen = SCREEN_LANDSCAPE_RIGHT;
 			break;
+        default:
+            mScreen = 0;
+            break;
 		}
 
-		if (rotation != Surface.ROTATION_180) {
-			mNative.setVideoOptions(mParam.getWidth(), mParam.getHeight(),
-					mParam.getBitrate(), mParam.getFps());
-		}
+        Log.d(TAG, "setPreviewOrientation, screen=" + mScreen + ", width=" + width + ", height=" + height);
+        mNative.setVideoOptions(width, height, mParam.getBitrate(), mParam.getFps());
 		
 		int result;
 		CameraInfo info = new CameraInfo();
@@ -222,17 +226,17 @@ public class VideoPusher extends Pusher implements Callback, PreviewCallback {
 		if (mPusherRuning) {
 			byte[] pData = data;
 			switch (mScreen) {
-			case SCREEN_PORTRAIT:
-				portraitData2Raw(data);
-				pData = mRaw;
-				break;
-			case SCREEN_LANDSCAPE_LEFT:
-				pData = data;
-				break;
-			case SCREEN_LANDSCAPE_RIGHT:
-				landscapeData2Raw(data);
-				pData = mRaw;
-				break;
+			    case SCREEN_PORTRAIT:
+                    portraitData2Raw(data);
+                    pData = mRaw;
+                    break;
+                case SCREEN_LANDSCAPE_LEFT:
+                    pData = data;
+                    break;
+                case SCREEN_LANDSCAPE_RIGHT:
+                    landscapeData2Raw(data);
+                    pData = mRaw;
+                    break;
 			}
 			mNative.fireVideo(pData);
 			pData = null;

@@ -36,7 +36,7 @@ public class PusherNative {
 
 	public native void setVideoOptions(int width, int height, int bitrate, int fps);
 
-	public native void setAudioOptions(int sampleRate, int channel);
+	public native void setAudioOptions(int sampleRate, int channel, int bitrate);
 
 	public native void fireVideo(byte[] buffer);
 
