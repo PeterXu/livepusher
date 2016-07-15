@@ -107,12 +107,12 @@ static pthread_cond_t s_cond = PTHREAD_COND_INITIALIZER;
 
 int checkPublishing(pusher_t *pusher) {
     if (!pusher->publishing || !pusher->readyRtmp) {
-        LOGW("publishing is stopped or rtmp not ready!");
+        //LOGW("publishing is stopped or rtmp not ready!");
         return -1;
     }
 
     if (!pusher->proto.rtmp || !RTMP_IsConnected(pusher->proto.rtmp)) {
-        LOGW("no rtmp or rtmp not connected!");
+        //LOGW("no rtmp or rtmp not connected!");
         return -1;
     }
 
@@ -553,7 +553,7 @@ void fireAudio(audio_enc_t *audio, jbyte* b_buffer, jint len) {
 JNIEXPORT void JNICALL Java_com_zenvv_live_jni_PusherNative_fireAudio(
         JNIEnv *env, jobject thiz, jbyteArray buffer, jint len) {
     if (checkPublishing(&s_pusher) != 0) {
-        LOGE("publishing is stopped!");
+        //LOGE("publishing is stopped!");
         return;
     }
 
@@ -663,7 +663,7 @@ void fireVideo(video_enc_t *video, jbyte *nv21_buffer) {
 JNIEXPORT void JNICALL Java_com_zenvv_live_jni_PusherNative_fireVideo(
         JNIEnv *env, jobject thiz, jbyteArray buffer) {
     if (checkPublishing(&s_pusher) != 0) {
-        LOGE("publishing is stopped!");
+        //LOGE("publishing is stopped!");
         return;
     }
 
