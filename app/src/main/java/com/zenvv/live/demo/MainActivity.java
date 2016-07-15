@@ -11,6 +11,8 @@ import android.view.SurfaceView;
 import android.view.View;
 import android.view.View.OnClickListener;
 import android.widget.Button;
+import android.widget.CheckBox;
+import android.widget.CompoundButton;
 import android.widget.EditText;
 import android.widget.RelativeLayout;
 import android.widget.TextView;
@@ -25,8 +27,8 @@ public class MainActivity extends Activity implements
 		Callback, LiveStateListener {
 	private final static String TAG = "MainActivity";
 
-	private final static String URI = "rtmp://v.sportsdata.cn/app/";
-	//private final static String URI = "http://v.sportsdata.cn/app/";
+	private final static String URI = "rtmp://v.sportsdata.cn/app";
+	//private final static String URI = "http://v.sportsdata.cn/app";
 
 	private Button mStartBtn;
 	private SurfaceHolder mHolder;
@@ -35,6 +37,9 @@ public class MainActivity extends Activity implements
 
 	private String mUrl;
 	private String mTitle;
+
+    private CheckBox mRecordCtrl;
+    private boolean mRecordChannel;
 
 	private boolean mShowCtrl = false;
 	private RelativeLayout mFloatCtrl;
@@ -83,6 +88,14 @@ public class MainActivity extends Activity implements
 		if (!mShowCtrl) {
 			mFloatCtrl.setVisibility(View.INVISIBLE);
 		}
+
+        mRecordCtrl = (CheckBox) findViewById(R.id.record_channel);
+        mRecordCtrl.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
+             @Override
+             public void onCheckedChanged(CompoundButton arg0, boolean arg1) {
+                 mRecordChannel = arg1;
+             }
+         });
 		
 		livePusher = new LivePusher(this, 640, 480, 768*1024, 20, CameraInfo.CAMERA_FACING_FRONT);
 		livePusher.setLiveStateListener(this);
@@ -103,10 +116,12 @@ public class MainActivity extends Activity implements
 
 	public void checkStatus(boolean forceStopped) {
 		if (forceStopped || isStart) {
+            mRecordCtrl.setEnabled(true);
 			mStartBtn.setText(R.string.start);
 			isStart = false;
 			livePusher.stopPusher();
 		}else {
+            mRecordCtrl.setEnabled(false);
 			mStartBtn.setText(R.string.stop);
 			isStart = true;
 			livePusher.startPusher(mUrl);
@@ -121,10 +136,10 @@ public class MainActivity extends Activity implements
 		mTitle = text1.getText().toString();
 		if (mTitle == null || mTitle.isEmpty()) {
 			Toast.makeText(MainActivity.this, R.string.invalid_title, Toast.LENGTH_SHORT).show();
-			return;
+            return;
 		}
 
-		mUrl = "";
+
 		EditText text2 = (EditText)findViewById(R.id.live_channel);
 		String channel = text2.getText().toString();
 		if (channel == null || channel.length() < 4) {
@@ -132,12 +147,18 @@ public class MainActivity extends Activity implements
 			return;
 		}
 
-		mUrl = URI + channel;
+        if (mRecordChannel) {
+            mUrl = URI + "?vhost=dvr/" + channel;
+        }else {
+		    mUrl = URI + "/" + channel;
+        }
 		tv.setText(mUrl);
 	}
 
 	public void onClickStart(View v) {
-		checkUserInput();
+        mUrl = "";
+
+        checkUserInput();
 
 		if (mUrl != null && !mUrl.isEmpty()) {
             checkStatus(false);

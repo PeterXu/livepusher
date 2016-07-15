@@ -27,5 +27,6 @@
     <string name="invalid_title">请先设置频道主题</string>
     <string name="live_channel">直播频道名字(英文字母)</string>
     <string name="invalid_channel">请先设置频道名(英文字母)</string>
+    <string name="record_channel">录制</string>
 
 </resources>

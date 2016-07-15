@@ -43,11 +43,21 @@
 	        android:id="@+id/live_url"
 	        android:hint="@+string/live_url"
 	        android:layout_below="@+id/live_channel"
-	        android:layout_width="match_parent"
+	        android:layout_width="300dp"
 	        android:layout_height="40dp"
+            android:layout_marginLeft="2dp"
 	        android:background="@android:color/holo_blue_dark"
-			android:singleLine="true"
 	        android:text="" />
+
+		<CheckBox
+			android:id="@+id/record_channel"
+            android:layout_below="@+id/live_channel"
+			android:layout_toRightOf="@+id/live_url"
+			android:layout_width="120dp"
+			android:layout_height="40dp"
+            android:singleLine="true"
+            android:checked="false"
+			android:text="@+string/record_channel" />
        	
        	<LinearLayout
        	    android:id="@+id/ctrl_btn"
@@ -92,8 +102,8 @@
 	            <requestFocus />
 	        </Button>
        	</LinearLayout>
-    	
-    </RelativeLayout>
+
+	</RelativeLayout>
 
 	<com.melnykov.fab.FloatingActionButton
 		android:id="@+id/fab"
