@@ -9,14 +9,16 @@ ifeq ($(TARGET_ARCH_ABI), armeabi-v7a)
 endif
 
 LOCAL_SRC_FILES :=  \
-	rtmp_faac.c	\
-	queue.c
+	cmdutils.c \
+	ffmpeg_opt.c \
+	ffmpeg_filter.c \
+	ffmpeg.c
 	
 LOCAL_CFLAGS := -std=c99 -fPIC
 LOCAL_LDLIBS := -Wl,--no-warn-shared-textrel -llog -lz
 
-LOCAL_STATIC_LIBRARIES := faac x264 rtmp
-LOCAL_STATIC_LIBRARIES += cpufeatures
+LOCAL_SHARED_LIBRARIES := ffmpeg x264 openh264
+LOCAL_STATIC_LIBRARIES := cpufeatures
 
 include $(BUILD_SHARED_LIBRARY)
 

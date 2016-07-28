@@ -1,27 +1,21 @@
-LOCAL_PATH:= $(call my-dir)
+LOCAL_PATH := $(call my-dir)
+FFMPEG_ROOT := $(HOME)/wspace/offical/ijkplayer-android/android/contrib
 
 include $(CLEAR_VARS)
-LOCAL_EXPORT_C_INCLUDES := $(LOCAL_PATH)/libs/faac/include
-LOCAL_SRC_FILES := libs/faac/$(TARGET_ARCH_ABI)/lib/libfaac.a
-$(info $(LOCAL_SRC_FILES))
-LOCAL_MODULE:= faac
-LOCAL_CFLAGS := -fPIC
-include $(PREBUILT_STATIC_LIBRARY)
+LOCAL_MODULE:= ffmpeg
+LOCAL_EXPORT_C_INCLUDES := $(FFMPEG_ROOT)/ffmpeg-armv7a
+LOCAL_SRC_FILES := $(FFMPEG_ROOT)/build/ffmpeg-armv7a/output/libijkffmpeg.so
+include $(PREBUILT_SHARED_LIBRARY)
 
 
 include $(CLEAR_VARS)
-LOCAL_EXPORT_C_INCLUDES := $(LOCAL_PATH)/libs/x264/include
-LOCAL_SRC_FILES := libs/x264/$(TARGET_ARCH_ABI)/lib/libx264.a
-$(info $(LOCAL_SRC_FILES))
 LOCAL_MODULE:= x264
-LOCAL_CFLAGS := -fPIC
-include $(PREBUILT_STATIC_LIBRARY)
+LOCAL_SRC_FILES := $(FFMPEG_ROOT)/build/ffmpeg-armv7a/output/libx264.so
+include $(PREBUILT_SHARED_LIBRARY)
 
 
 include $(CLEAR_VARS)
-LOCAL_EXPORT_C_INCLUDES := $(LOCAL_PATH)/libs/rtmpdump/include
-LOCAL_SRC_FILES := libs/rtmpdump/$(TARGET_ARCH_ABI)/lib/librtmp.a
-$(info $(LOCAL_SRC_FILES))
-LOCAL_MODULE:= rtmp
-LOCAL_CFLAGS := -fPIC
-include $(PREBUILT_STATIC_LIBRARY)
+LOCAL_MODULE:= openh264
+LOCAL_SRC_FILES := $(FFMPEG_ROOT)/build/ffmpeg-armv7a/output/libopenh264.so
+include $(PREBUILT_SHARED_LIBRARY)
+
