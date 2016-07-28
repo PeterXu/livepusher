@@ -109,7 +109,7 @@ int exit_on_error     = 0;
 int abort_on_flags    = 0;
 int print_stats       = -1;
 int qp_hist           = 0;
-int stdin_interaction = 1;
+int stdin_interaction = 0;
 int frame_bits_per_raw_sample = 0;
 float max_error_rate  = 2.0/3;
 

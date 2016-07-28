@@ -24,6 +24,8 @@
  */
 
 #include "config.h"
+#undef HAVE_TERMIOS_H
+
 #include <ctype.h>
 #include <string.h>
 #include <math.h>
@@ -327,7 +329,7 @@ sigterm_handler(int sig)
         write(2/*STDERR_FILENO*/, "Received > 3 system signals, hard exiting\n",
                            strlen("Received > 3 system signals, hard exiting\n"));
 
-        exit(123);
+        //exit(123);
     }
 }
 
@@ -4264,7 +4266,7 @@ static void log_callback_null(void *ptr, int level, const char *fmt, va_list vl)
 {
 }
 
-int main(int argc, char **argv)
+int ffmpeg_main(int argc, char **argv)
 {
     int ret;
     int64_t ti;

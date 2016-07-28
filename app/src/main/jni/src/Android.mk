@@ -12,7 +12,8 @@ LOCAL_SRC_FILES :=  \
 	cmdutils.c \
 	ffmpeg_opt.c \
 	ffmpeg_filter.c \
-	ffmpeg.c
+	ffmpeg.c \
+	japi.c
 	
 LOCAL_CFLAGS := -std=c99 -fPIC
 LOCAL_LDLIBS := -Wl,--no-warn-shared-textrel -llog -lz
