@@ -25,8 +25,10 @@ public class AudioPusher extends Pusher {
 		minBufferSize = AudioRecord.getMinBufferSize(mParam.getSampleRate(), channel, pcmBits);
 		audioRecord = new AudioRecord(MediaRecorder.AudioSource.MIC,
 				mParam.getSampleRate(), channel, pcmBits, minBufferSize);
-		mNative.setAudioOptions(mParam.getSampleRate(), mParam.getChannel(), mParam.getBitrate());
-		Log.d(TAG, "audio input:" + mNative.getInputSamples());
+
+		String inOpts = "-f s16le -ar 44.1k -ac 1";
+		String encOpts = "-acodec aac -ar 44.1k -ac 1 -ab 32k -strict -2";
+		mNative.setAudioOptions(inOpts, encOpts);
 	}
 
 	@Override

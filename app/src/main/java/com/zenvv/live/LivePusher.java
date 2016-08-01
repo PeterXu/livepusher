@@ -19,6 +19,9 @@ public class LivePusher {
 	private Activity mActivity;
 
 	static {
+		System.loadLibrary("openh264");
+		System.loadLibrary("x264");
+		System.loadLibrary("ijkffmpeg");
 		System.loadLibrary("Pusher");
 	}
 
