@@ -5,8 +5,10 @@
 #include <android/log.h>
 
 #include <unistd.h>
+#include <string.h>
 #include <fcntl.h>
 #include <sys/stat.h>
+#include <errno.h>
 
 #define DEBUG
 #ifdef DEBUG
@@ -27,8 +29,9 @@
 #define MAX_PATH 260
 #endif
 
-#define FIFO_AUDIO "/data/ffmpeg_pipe_audio"
-#define FIFO_VIDEO "/data/ffmpeg_pipe_video"
+
+#define FIFO_AUDIO "/sdcard/zffmpeg_pipe_audio"
+#define FIFO_VIDEO "/sdcard/zffmpeg_pipe_video"
 
 enum {
     E_AUDIO = 0,
@@ -50,7 +53,7 @@ enum {
 static volatile int s_status = E_None;
 
 
-static void setOptions(char *str, char *oopts[]) {
+static void setOptions(char *str, char oopts[][MAX_PATH]) {
     int argc = 0;
     const char delim[] = "\t ";
     char *argv = strtok(str, delim);
@@ -60,12 +63,12 @@ static void setOptions(char *str, char *oopts[]) {
         argv = strtok(NULL, delim);
     }
 }
-static void setMediaOptions(JNIEnv *env, jstring opts, char *oopts[]) {
+static void setMediaOptions(JNIEnv *env, jstring opts, char oopts[][MAX_PATH]) {
     const char *str = (*env)->GetStringUTFChars(env, opts, 0);
     setOptions((char *)str, oopts);
     (*env)->ReleaseStringUTFChars(env, opts, str);
 }
-static void setArgvOptions(char *argv[], int *argc, char *oopts[]) {
+static void setArgvOptions(char argv[][MAX_PATH], int *argc, char oopts[][MAX_PATH]) {
     for (int k=0; k < 32; k++) {
         if (strlen(oopts[k]) <= 0) 
             break;
@@ -77,14 +80,16 @@ static void setArgvOptions(char *argv[], int *argc, char *oopts[]) {
 }
 
 static int initPipe(int *fd, const char *fname, int mode) {
-    if (*fd > 0) {
+    if (*fd <= 0) {
         if(access(fname, F_OK) == -1){  
             if(mkfifo(fname, 0777) < 0) {  
+                LOGE("initPipe, mkfifio fail: %s", strerror(errno));
                 return -1;
             }
         }
-        *fd = open(fname, mode);
+        *fd = open(fname, mode|O_NONBLOCK);
     }
+    LOGI("initPipe, fname=%s, fd=%d", fname, *fd);
     return *fd;
 }
 static void closePipe(int *fd) {
@@ -96,12 +101,12 @@ static void closePipe(int *fd) {
 
 
 DEFINE_API(void, setVideoOptions)(JNIEnv *env, jobject thiz, jstring iopts, jstring eopts) {
-    setMediaOptions(env, iopts, (char **)s_iopts[E_VIDEO]);
-    setMediaOptions(env, eopts, (char **)s_eopts[E_VIDEO]);
+    setMediaOptions(env, iopts, s_iopts[E_VIDEO]);
+    setMediaOptions(env, eopts, s_eopts[E_VIDEO]);
 }
 DEFINE_API(void, setAudioOptions)(JNIEnv *env, jobject thiz, jstring iopts, jstring eopts) {
-    setMediaOptions(env, iopts, (char **)s_iopts[E_AUDIO]);
-    setMediaOptions(env, eopts, (char **)s_eopts[E_AUDIO]);
+    setMediaOptions(env, iopts, s_iopts[E_AUDIO]);
+    setMediaOptions(env, eopts, s_eopts[E_AUDIO]);
 }
 
 extern int ffmpeg_main(int argc, char **argv);
@@ -113,16 +118,16 @@ DEFINE_API(void, startPusher)(JNIEnv *env, jobject thiz, jstring url) {
     char argv[128][MAX_PATH] = {{"ffmpeg\0"}, {"-d\0"}};
 
     // set video options
-    setArgvOptions((char **)argv, &argc, (char **)s_iopts[E_VIDEO]);
+    setArgvOptions(argv, &argc, s_iopts[E_VIDEO]);
     int fd1 = initPipe(&s_rpipe[E_VIDEO], FIFO_VIDEO, O_RDONLY);
     sprintf(argv[argc++], "-i pipe:%d", fd1);
-    setArgvOptions((char **)argv, &argc, (char **)s_eopts[E_VIDEO]);
+    setArgvOptions(argv, &argc, s_eopts[E_VIDEO]);
 
     // set audio options
-    setArgvOptions((char **)argv, &argc, (char **)s_iopts[E_AUDIO]);
+    setArgvOptions(argv, &argc, s_iopts[E_AUDIO]);
     int fd2 = initPipe(&s_rpipe[E_AUDIO], FIFO_AUDIO, O_RDONLY);
     sprintf(argv[argc++], "-i pipe:%d", fd2);
-    setArgvOptions((char **)argv, &argc, (char **)s_eopts[E_AUDIO]);
+    setArgvOptions(argv, &argc, s_eopts[E_AUDIO]);
 
     // set url
     const char *purl = (*env)->GetStringUTFChars(env, url, 0);
