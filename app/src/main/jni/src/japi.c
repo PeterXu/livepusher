@@ -10,15 +10,16 @@
 #include <sys/stat.h>
 #include <errno.h>
 
+#define TAG "NDK1"
 #define DEBUG
 #ifdef DEBUG
-#define LOGD(...) __android_log_print(ANDROID_LOG_DEBUG, "NDK", __VA_ARGS__)
+#define LOGD(...) __android_log_print(ANDROID_LOG_DEBUG, TAG, __VA_ARGS__)
 #else
 #define LOGD(...)
 #endif
-#define LOGI(...) __android_log_print(ANDROID_LOG_INFO,  "NDK", __VA_ARGS__)
-#define LOGW(...) __android_log_print(ANDROID_LOG_WARN,  "NDK", __VA_ARGS__)
-#define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, "NDK", __VA_ARGS__)
+#define LOGI(...) __android_log_print(ANDROID_LOG_INFO,  TAG, __VA_ARGS__)
+#define LOGW(...) __android_log_print(ANDROID_LOG_WARN,  TAG, __VA_ARGS__)
+#define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, TAG, __VA_ARGS__)
 
 
 #ifndef DEFINE_API
@@ -68,13 +69,13 @@ static void setMediaOptions(JNIEnv *env, jstring opts, char oopts[][MAX_PATH]) {
     setOptions((char *)str, oopts);
     (*env)->ReleaseStringUTFChars(env, opts, str);
 }
-static void setArgvOptions(char argv[][MAX_PATH], int *argc, char oopts[][MAX_PATH]) {
+static void setArgvOptions(char *argv[], int *argc, char oopts[][MAX_PATH]) {
     for (int k=0; k < 32; k++) {
         if (strlen(oopts[k]) <= 0) 
             break;
 
         int pos = *argc;
-        strcpy(argv[pos], oopts[k]);
+        argv[pos] = strdup(oopts[k]);
         *argc = pos + 1;
     }
 }
@@ -109,45 +110,80 @@ DEFINE_API(void, setAudioOptions)(JNIEnv *env, jobject thiz, jstring iopts, jstr
     setMediaOptions(env, eopts, s_eopts[E_AUDIO]);
 }
 
-extern int ffmpeg_main(int argc, char **argv);
-DEFINE_API(void, startPusher)(JNIEnv *env, jobject thiz, jstring url) {
-    if (s_status == E_START) 
-        return;
 
-    int  argc = 2;
-    char argv[128][MAX_PATH] = {{"ffmpeg\0"}, {"-d\0"}};
+void get_options(int *pargc, char *argv[], char *url) {
+    int argc = 0;
+    argv[argc++] = strdup("ffmpeg\0");
+    //argv[argc++] = strdup("-d\0");
 
     // set video options
     setArgvOptions(argv, &argc, s_iopts[E_VIDEO]);
+    argv[argc++] = strdup("-i");
     int fd1 = initPipe(&s_rpipe[E_VIDEO], FIFO_VIDEO, O_RDONLY);
-    sprintf(argv[argc++], "-i pipe:%d", fd1);
+    argv[argc++] = strdup(FIFO_VIDEO);
+
+    // set video encoder
     setArgvOptions(argv, &argc, s_eopts[E_VIDEO]);
 
     // set audio options
     setArgvOptions(argv, &argc, s_iopts[E_AUDIO]);
+    argv[argc++] = strdup("-i");
     int fd2 = initPipe(&s_rpipe[E_AUDIO], FIFO_AUDIO, O_RDONLY);
-    sprintf(argv[argc++], "-i pipe:%d", fd2);
+    argv[argc++] = strdup(FIFO_AUDIO);
+
+    // set audio encoder
     setArgvOptions(argv, &argc, s_eopts[E_AUDIO]);
 
     // set url
-    const char *purl = (*env)->GetStringUTFChars(env, url, 0);
-    strcpy(argv[argc++], "-f");
-    strcpy(argv[argc++], "flv");
-    strcpy(argv[argc++], purl);
-    (*env)->ReleaseStringUTFChars(env, url, purl);
+    argv[argc++] = strdup("-f");
+    argv[argc++] = strdup("flv");
+    argv[argc++] = strdup(url);
+
+    // set param num
+    *pargc = argc;
 
     // print all params
-    int pos = 0;
-    char param[2048] = {0};
-    for (int k=0; k < argc; k++) {
-        if (strlen(argv[k]) <= 0)
-            break;
-        pos += sprintf(param+pos, "%s ", argv[k]);
+    char tmpstr[2048] = {0};
+    for (int k=0, pos=0; k < argc; k++) {
+        pos += sprintf(tmpstr+pos, "%s ", argv[k]);
     }
-    LOGI("==> %s", param);
+    LOGI("==> %s", tmpstr);
+}
 
-    ffmpeg_main(argc, (char **)argv);
+extern int ffmpeg_main(int argc, char **argv);
+void *main_loop(void *param) {
+    char *url = (char *)param;
+    if (!url)
+        return NULL;
+
+    int  argc = 0;
+    char *argv[128];
+    memset(argv, 0, 128*sizeof(char *));
+    get_options(&argc, argv, url);
+
+    LOGI("main_loop: start to run ffmpeg ...");
     s_status = E_START;
+    ffmpeg_main(argc, (char **)argv);
+    LOGI("main_loop: exit");
+
+    for (int k=0; k < argc; k++) {
+        if (argv[k]) free(argv[k]);
+    }
+
+    pthread_exit(0);
+}
+
+DEFINE_API(void, startPusher)(JNIEnv *env, jobject thiz, jstring url) {
+    if (s_status == E_START) 
+        return;
+
+    static char stream_url[1024] = {0};
+    const char *purl = (*env)->GetStringUTFChars(env, url, 0);
+    strcpy(stream_url, purl);
+    (*env)->ReleaseStringUTFChars(env, url, purl);
+
+    pthread_t tid;
+    pthread_create(&tid, NULL, main_loop, stream_url);
 }
 
 DEFINE_API(void, stopPusher)(JNIEnv *env, jobject thiz) {
@@ -156,6 +192,7 @@ DEFINE_API(void, stopPusher)(JNIEnv *env, jobject thiz) {
 
     pid_t pid = getpid();
     if (pid > 1) {
+        LOGI("stopPusher: send SIGINT");
         kill(pid, SIGINT);
         sleep(1);
     }

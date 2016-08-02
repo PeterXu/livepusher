@@ -4167,7 +4167,7 @@ static int transcode(void)
     }
 
     /* dump report by using the first video and audio streams */
-    print_report(1, timer_start, av_gettime_relative());
+    //print_report(1, timer_start, av_gettime_relative());
 
     /* close each encoder */
     for (i = 0; i < nb_output_streams; i++) {
@@ -4266,6 +4266,22 @@ static void log_callback_null(void *ptr, int level, const char *fmt, va_list vl)
 {
 }
 
+#include <android/log.h>
+static void log_callback_android(void *ptr, int level, const char *fmt, va_list vl)
+{
+    int level2 = ANDROID_LOG_DEBUG;
+    if (level >= AV_LOG_VERBOSE) 
+        level2 = ANDROID_LOG_DEBUG;
+    else if (level >= AV_LOG_INFO) 
+        level2 = ANDROID_LOG_INFO;
+    else if (level >= AV_LOG_WARNING) 
+        level2 = ANDROID_LOG_WARN;
+    else if (level <= AV_LOG_ERROR)
+        level2 = ANDROID_LOG_ERROR;
+
+    __android_log_vprint(level2, "NDK2", fmt, vl);
+}
+
 int ffmpeg_main(int argc, char **argv)
 {
     int ret;
@@ -4276,13 +4292,16 @@ int ffmpeg_main(int argc, char **argv)
     setvbuf(stderr,NULL,_IONBF,0); /* win32 runtime needs this */
 
     av_log_set_flags(AV_LOG_SKIP_REPEATED);
-    parse_loglevel(argc, argv, options);
+    //parse_loglevel(argc, argv, options);
 
     if(argc>1 && !strcmp(argv[1], "-d")){
         run_as_daemon=1;
         av_log_set_callback(log_callback_null);
         argc--;
         argv++;
+    }else {
+        av_log_set_level(AV_LOG_DEBUG);
+        av_log_set_callback(log_callback_android);
     }
 
     avcodec_register_all();
