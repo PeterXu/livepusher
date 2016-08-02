@@ -3,6 +3,7 @@
 #include <pthread.h>
 #include <cpu-features.h>
 #include <android/log.h>
+#include "libavutil/log.h"
 
 #include <unistd.h>
 #include <string.h>
@@ -47,6 +48,7 @@ static int s_wpipe[2] = {-1, -1};
 
 enum {
     E_None = 0,
+    E_INIT,
     E_START,
     E_STOP,
 };
@@ -90,7 +92,7 @@ static int initPipe(int *fd, const char *fname, int mode) {
         }
         *fd = open(fname, mode|O_NONBLOCK);
     }
-    LOGI("initPipe, fname=%s, fd=%d", fname, *fd);
+    //LOGI("initPipe, fname=%s, fd=%d", fname, *fd);
     return *fd;
 }
 static void closePipe(int *fd) {
@@ -120,11 +122,13 @@ void get_options(int *pargc, char *argv[], char *url) {
     setArgvOptions(argv, &argc, s_iopts[E_VIDEO]);
     argv[argc++] = strdup("-i");
     int fd1 = initPipe(&s_rpipe[E_VIDEO], FIFO_VIDEO, O_RDONLY);
-    argv[argc++] = strdup(FIFO_VIDEO);
+    //argv[argc++] = strdup(FIFO_VIDEO);
+    argv[argc++] = strdup("/sdcard/ffmpeg/test.y4m");
 
     // set video encoder
     setArgvOptions(argv, &argc, s_eopts[E_VIDEO]);
 
+#if 0
     // set audio options
     setArgvOptions(argv, &argc, s_iopts[E_AUDIO]);
     argv[argc++] = strdup("-i");
@@ -133,10 +137,12 @@ void get_options(int *pargc, char *argv[], char *url) {
 
     // set audio encoder
     setArgvOptions(argv, &argc, s_eopts[E_AUDIO]);
+#endif
 
     // set url
     argv[argc++] = strdup("-f");
     argv[argc++] = strdup("flv");
+    argv[argc++] = strdup("-y");
     argv[argc++] = strdup(url);
 
     // set param num
@@ -150,26 +156,26 @@ void get_options(int *pargc, char *argv[], char *url) {
     LOGI("==> %s", tmpstr);
 }
 
-extern int ffmpeg_main(int argc, char **argv);
 void *main_loop(void *param) {
-    char *url = (char *)param;
-    if (!url)
+    if (!param)
         return NULL;
 
     int  argc = 0;
     char *argv[128];
     memset(argv, 0, 128*sizeof(char *));
-    get_options(&argc, argv, url);
+    get_options(&argc, argv, (char *)param);
 
-    LOGI("main_loop: start to run ffmpeg ...");
+    LOGI("main_loop: run ...");
     s_status = E_START;
+    extern int ffmpeg_main(int argc, char **argv);
     ffmpeg_main(argc, (char **)argv);
-    LOGI("main_loop: exit");
 
+    LOGI("main_loop: free");
     for (int k=0; k < argc; k++) {
         if (argv[k]) free(argv[k]);
     }
 
+    LOGI("main_loop: exit");
     pthread_exit(0);
 }
 
@@ -182,6 +188,8 @@ DEFINE_API(void, startPusher)(JNIEnv *env, jobject thiz, jstring url) {
     strcpy(stream_url, purl);
     (*env)->ReleaseStringUTFChars(env, url, purl);
 
+    strcpy(stream_url, "/sdcard/ffmpeg/test_out.flv");
+    LOGI("startPusher, url: %s", stream_url);
     pthread_t tid;
     pthread_create(&tid, NULL, main_loop, stream_url);
 }
@@ -190,13 +198,11 @@ DEFINE_API(void, stopPusher)(JNIEnv *env, jobject thiz) {
     if (s_status != E_START)
         return;
 
-    pid_t pid = getpid();
-    if (pid > 1) {
-        LOGI("stopPusher: send SIGINT");
-        kill(pid, SIGINT);
-        sleep(1);
-    }
+    LOGI("stopPusher, begin");
+    extern void ffmpeg_cleanup(int ret);
+    ffmpeg_cleanup(0);
     s_status = E_STOP;
+    LOGI("stopPusher, end");
 }
 
 static void fireData(JNIEnv *env, jbyteArray data, jint len, int fd) {
@@ -208,11 +214,39 @@ static void fireData(JNIEnv *env, jbyteArray data, jint len, int fd) {
 DEFINE_API(void, fireVideo)(JNIEnv *env, jobject thiz, jbyteArray data, jint len) {
     if (s_status != E_START)
         return;
+    return;
 
     int fd = initPipe(&s_wpipe[E_VIDEO], FIFO_VIDEO, O_WRONLY);
-    if (fd > 0) {
-        fireData(env, data, len, fd);
+    if (fd <= 0)
+        return;
+
+    static int volatile firstVideo = 1;
+    if (firstVideo) {
+        firstVideo = 0;
+
+#define Y4M_LINE_MAX 256
+#define Y4M_MAGIC "YUV4MPEG2"
+#define Y4M_FRAME_MAGIC "FRAME"
+#define MAX_FRAME_HEADER 80
+
+        int width=640, height=480;
+        int raten=20, rated=1;
+        int aspectn=0, aspectd=0;
+        char inter = 'p';
+        const char *colorspace = " C420jpeg XYSCSS=420JPEG";
+
+        char buf[Y4M_LINE_MAX] = {0};
+        int n = snprintf(buf, Y4M_LINE_MAX, "%s W%d H%d F%d:%d I%c A%d:%d%s\n",
+                Y4M_MAGIC, width, height, raten, rated, inter,
+                aspectn, aspectd, colorspace);
+        write(fd, buf, strlen(buf));
     }
+
+    char frame[MAX_FRAME_HEADER] = {0};
+    snprintf(frame, MAX_FRAME_HEADER, "%s\n", Y4M_FRAME_MAGIC);
+    write(fd, frame, strlen(frame));
+
+    fireData(env, data, len, fd);
 }
 DEFINE_API(void, fireAudio)(JNIEnv *env, jobject thiz, jbyteArray data, jint len) {
     if (s_status != E_START)
@@ -232,5 +266,36 @@ DEFINE_API(void, release)(JNIEnv *env, jobject thiz) {
 
     closePipe(&s_wpipe[E_AUDIO]);
     closePipe(&s_wpipe[E_VIDEO]);
+}
+
+void ffmpeg_once() {
+    avcodec_register_all();
+#if CONFIG_AVDEVICE
+    avdevice_register_all();
+#endif
+    avfilter_register_all();
+    av_register_all();
+}
+JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM *vm, void *reserved) {
+    ffmpeg_once();
+    return JNI_VERSION_1_4;
+}
+
+void log_callback_android(void *ptr, int level, const char *fmt, va_list vl)
+{
+    if (level == AV_LOG_QUIET)
+        return;
+
+    int level2 = ANDROID_LOG_DEBUG;
+    if (level >= AV_LOG_VERBOSE)
+        level2 = ANDROID_LOG_DEBUG;
+    else if (level >= AV_LOG_INFO)
+        level2 = ANDROID_LOG_INFO;
+    else if (level >= AV_LOG_WARNING)
+        level2 = ANDROID_LOG_WARN;
+    else if (level >= AV_LOG_PANIC)
+        level2 = ANDROID_LOG_ERROR;
+
+    __android_log_vprint(level2, "NDK2", fmt, vl);
 }
 

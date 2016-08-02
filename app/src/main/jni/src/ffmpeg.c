@@ -24,8 +24,6 @@
  */
 
 #include "config.h"
-#undef HAVE_TERMIOS_H
-
 #include <ctype.h>
 #include <string.h>
 #include <math.h>
@@ -329,7 +327,7 @@ sigterm_handler(int sig)
         write(2/*STDERR_FILENO*/, "Received > 3 system signals, hard exiting\n",
                            strlen("Received > 3 system signals, hard exiting\n"));
 
-        //exit(123);
+        exit(123);
     }
 }
 
@@ -458,7 +456,7 @@ static int decode_interrupt_cb(void *ctx)
 
 const AVIOInterruptCB int_cb = { decode_interrupt_cb, NULL };
 
-static void ffmpeg_cleanup(int ret)
+void ffmpeg_cleanup(int ret)
 {
     int i, j;
 
@@ -484,6 +482,8 @@ static void ffmpeg_cleanup(int ret)
 
         av_freep(&filtergraphs[i]);
     }
+    nb_filtergraphs = 0;
+
     av_freep(&filtergraphs);
 
     av_freep(&subtitle_out);
@@ -502,6 +502,8 @@ static void ffmpeg_cleanup(int ret)
 
         av_freep(&output_files[i]);
     }
+    nb_output_files = 0;
+
     for (i = 0; i < nb_output_streams; i++) {
         OutputStream *ost = output_streams[i];
         AVBitStreamFilterContext *bsfc;
@@ -535,6 +537,8 @@ static void ffmpeg_cleanup(int ret)
 
         av_freep(&output_streams[i]);
     }
+    nb_output_streams = 0;
+
 #if HAVE_PTHREADS
     free_input_threads();
 #endif
@@ -542,6 +546,8 @@ static void ffmpeg_cleanup(int ret)
         avformat_close_input(&input_files[i]->ctx);
         av_freep(&input_files[i]);
     }
+    nb_input_files = 0;
+
     for (i = 0; i < nb_input_streams; i++) {
         InputStream *ist = input_streams[i];
 
@@ -557,6 +563,7 @@ static void ffmpeg_cleanup(int ret)
 
         av_freep(&input_streams[i]);
     }
+    nb_input_streams = 0;
 
     if (vstats_file) {
         if (fclose(vstats_file))
@@ -3016,8 +3023,7 @@ static int transcode_init(void)
             case AVMEDIA_TYPE_ATTACHMENT:
                 break;
             default:
-                //abort();
-                exit_program(1);
+                abort();
             }
         } else {
             if (!ost->enc)
@@ -3160,8 +3166,7 @@ static int transcode_init(void)
             case AVMEDIA_TYPE_DATA:
                 break;
             default:
-                //abort();
-                exit_program(1);
+                abort();
                 break;
             }
         }
@@ -3199,6 +3204,7 @@ static int transcode_init(void)
     }
 
     /* open each encoder */
+    av_log(NULL, AV_LOG_INFO, "=> init output stream ...");
     for (i = 0; i < nb_output_streams; i++) {
         ret = init_output_stream(output_streams[i], error, sizeof(error));
         if (ret < 0)
@@ -3206,6 +3212,7 @@ static int transcode_init(void)
     }
 
     /* init input streams */
+    av_log(NULL, AV_LOG_INFO, "=> init input stream ...");
     for (i = 0; i < nb_input_streams; i++)
         if ((ret = init_input_stream(i, error, sizeof(error))) < 0) {
             for (i = 0; i < nb_output_streams; i++) {
@@ -4167,7 +4174,7 @@ static int transcode(void)
     }
 
     /* dump report by using the first video and audio streams */
-    //print_report(1, timer_start, av_gettime_relative());
+    print_report(1, timer_start, av_gettime_relative());
 
     /* close each encoder */
     for (i = 0; i < nb_output_streams; i++) {
@@ -4266,20 +4273,12 @@ static void log_callback_null(void *ptr, int level, const char *fmt, va_list vl)
 {
 }
 
-#include <android/log.h>
-static void log_callback_android(void *ptr, int level, const char *fmt, va_list vl)
-{
-    int level2 = ANDROID_LOG_DEBUG;
-    if (level >= AV_LOG_VERBOSE) 
-        level2 = ANDROID_LOG_DEBUG;
-    else if (level >= AV_LOG_INFO) 
-        level2 = ANDROID_LOG_INFO;
-    else if (level >= AV_LOG_WARNING) 
-        level2 = ANDROID_LOG_WARN;
-    else if (level <= AV_LOG_ERROR)
-        level2 = ANDROID_LOG_ERROR;
-
-    __android_log_vprint(level2, "NDK2", fmt, vl);
+static void ffmpeg_init() {
+    received_sigterm = 0;
+    received_nb_signals = 0;
+    transcode_init_done = 0;
+    ffmpeg_exited = 0;
+    main_return_code = 0;
 }
 
 int ffmpeg_main(int argc, char **argv)
@@ -4287,12 +4286,14 @@ int ffmpeg_main(int argc, char **argv)
     int ret;
     int64_t ti;
 
+    ffmpeg_init();
+
     register_exit(ffmpeg_cleanup);
 
     setvbuf(stderr,NULL,_IONBF,0); /* win32 runtime needs this */
 
     av_log_set_flags(AV_LOG_SKIP_REPEATED);
-    //parse_loglevel(argc, argv, options);
+    parse_loglevel(argc, argv, options);
 
     if(argc>1 && !strcmp(argv[1], "-d")){
         run_as_daemon=1;
@@ -4300,16 +4301,19 @@ int ffmpeg_main(int argc, char **argv)
         argc--;
         argv++;
     }else {
-        av_log_set_level(AV_LOG_DEBUG);
+        av_log_set_level(AV_LOG_VERBOSE);
+        extern void log_callback_android(void *ptr, int level, const char *fmt, va_list vl);
         av_log_set_callback(log_callback_android);
     }
 
+#if 0
     avcodec_register_all();
 #if CONFIG_AVDEVICE
     avdevice_register_all();
 #endif
     avfilter_register_all();
     av_register_all();
+#endif
     avformat_network_init();
 
     show_banner(argc, argv, options);
