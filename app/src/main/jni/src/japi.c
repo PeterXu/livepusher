@@ -3,13 +3,17 @@
 #include <pthread.h>
 #include <cpu-features.h>
 #include <android/log.h>
-#include "libavutil/log.h"
 
 #include <unistd.h>
 #include <string.h>
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <errno.h>
+#include <sys/un.h>
+#include <sys/socket.h>
+#include <sys/types.h>
+
+#include "libavutil/log.h"
 
 #define TAG "NDK1"
 #define DEBUG
@@ -32,19 +36,13 @@
 #endif
 
 
-#define FIFO_AUDIO "/sdcard/zffmpeg_pipe_audio"
-#define FIFO_VIDEO "/sdcard/zffmpeg_pipe_video"
+#define FIFO_AUDIO "/sdcard/zunix_audio"
+#define FIFO_VIDEO "/sdcard/zunix_video"
 
 enum {
     E_AUDIO = 0,
     E_VIDEO = 1,
 };
-
-static char s_iopts[2][32][MAX_PATH] = {{{"\0"}}};
-static char s_eopts[2][32][MAX_PATH] = {{{"\0"}}};
-
-static int s_rpipe[2] = {-1, -1};
-static int s_wpipe[2] = {-1, -1};
 
 enum {
     E_None = 0,
@@ -53,6 +51,10 @@ enum {
     E_STOP,
 };
 
+
+static char s_iopts[2][32][MAX_PATH] = {{{"\0"}}};
+static char s_eopts[2][32][MAX_PATH] = {{{"\0"}}};
+static volatile int s_pipe[2] = {-1, -1};
 static volatile int s_status = E_None;
 
 
@@ -82,17 +84,34 @@ static void setArgvOptions(char *argv[], int *argc, char oopts[][MAX_PATH]) {
     }
 }
 
-static int initPipe(int *fd, const char *fname, int mode) {
-    if (*fd <= 0) {
-        if(access(fname, F_OK) == -1){  
-            if(mkfifo(fname, 0777) < 0) {  
-                LOGE("initPipe, mkfifio fail: %s", strerror(errno));
-                return -1;
-            }
-        }
-        *fd = open(fname, mode|O_NONBLOCK);
+static int initPipe(int *fd, const char *fname) {
+    if (!fname)
+        return -1;
+
+    if (*fd > 0)
+        return *fd;
+
+    unlink(fname);
+
+    int sock = socket(AF_UNIX, SOCK_STREAM, 0);
+    if (sock < 0) {
+        LOGE("open unix socket");
+        return -1;
     }
-    //LOGI("initPipe, fname=%s, fd=%d", fname, *fd);
+
+    struct sockaddr_un addr;
+    memset(&addr, 0, sizeof(addr));
+    addr.sun_family = AF_UNIX;
+    strcpy(addr.sun_path, fname);
+
+    int ret = connect(sock, (struct sockaddr*)&addr, sizeof(addr));
+    if (ret == -1) {
+        LOGE("connect unix socket: %s", fname);
+        close(sock);
+        return -1;
+    }
+
+    *fd = sock;
     return *fd;
 }
 static void closePipe(int *fd) {
@@ -101,7 +120,6 @@ static void closePipe(int *fd) {
         *fd = -1;
     }
 }
-
 
 DEFINE_API(void, setVideoOptions)(JNIEnv *env, jobject thiz, jstring iopts, jstring eopts) {
     setMediaOptions(env, iopts, s_iopts[E_VIDEO]);
@@ -112,8 +130,34 @@ DEFINE_API(void, setAudioOptions)(JNIEnv *env, jobject thiz, jstring iopts, jstr
     setMediaOptions(env, eopts, s_eopts[E_AUDIO]);
 }
 
+void write_y4m_header(int fd) {
+    static int volatile firstVideo = 1;
+    if (firstVideo) {
+        firstVideo = 0;
+
+#define Y4M_LINE_MAX 256
+#define Y4M_MAGIC "YUV4MPEG2"
+#define Y4M_FRAME_MAGIC "FRAME"
+#define MAX_FRAME_HEADER 80
+
+        int width=640, height=480;
+        int raten=20, rated=1;
+        int aspectn=0, aspectd=0;
+        char inter = 'p';
+        const char *colorspace = " C420jpeg XYSCSS=420JPEG";
+
+        char buf[Y4M_LINE_MAX] = {0};
+        int n = snprintf(buf, Y4M_LINE_MAX, "%s W%d H%d F%d:%d I%c A%d:%d%s\n",
+                Y4M_MAGIC, width, height, raten, rated, inter,
+                aspectn, aspectd, colorspace);
+        LOGI("y4m header: %s", buf);
+        write(fd, buf, strlen(buf));
+    }
+}
 
 void get_options(int *pargc, char *argv[], char *url) {
+    char tmpstr[2048] = {0};
+
     int argc = 0;
     argv[argc++] = strdup("ffmpeg\0");
     //argv[argc++] = strdup("-d\0");
@@ -121,21 +165,15 @@ void get_options(int *pargc, char *argv[], char *url) {
     // set video options
     setArgvOptions(argv, &argc, s_iopts[E_VIDEO]);
     argv[argc++] = strdup("-i");
-    int fd1 = initPipe(&s_rpipe[E_VIDEO], FIFO_VIDEO, O_RDONLY);
-    //argv[argc++] = strdup(FIFO_VIDEO);
-    argv[argc++] = strdup("/sdcard/ffmpeg/test.y4m");
-
-    // set video encoder
+    argv[argc++] = strdup("unix:/"FIFO_VIDEO);
+    //argv[argc++] = strdup("/sdcard/ffmpeg/test.y4m");
     setArgvOptions(argv, &argc, s_eopts[E_VIDEO]);
 
 #if 0
     // set audio options
     setArgvOptions(argv, &argc, s_iopts[E_AUDIO]);
     argv[argc++] = strdup("-i");
-    int fd2 = initPipe(&s_rpipe[E_AUDIO], FIFO_AUDIO, O_RDONLY);
-    argv[argc++] = strdup(FIFO_AUDIO);
-
-    // set audio encoder
+    argv[argc++] = strdup("unix:/"FIFO_AUDIO);
     setArgvOptions(argv, &argc, s_eopts[E_AUDIO]);
 #endif
 
@@ -149,7 +187,6 @@ void get_options(int *pargc, char *argv[], char *url) {
     *pargc = argc;
 
     // print all params
-    char tmpstr[2048] = {0};
     for (int k=0, pos=0; k < argc; k++) {
         pos += sprintf(tmpstr+pos, "%s ", argv[k]);
     }
@@ -170,7 +207,6 @@ void *main_loop(void *param) {
     extern int ffmpeg_main(int argc, char **argv);
     ffmpeg_main(argc, (char **)argv);
 
-    LOGI("main_loop: free");
     for (int k=0; k < argc; k++) {
         if (argv[k]) free(argv[k]);
     }
@@ -188,7 +224,7 @@ DEFINE_API(void, startPusher)(JNIEnv *env, jobject thiz, jstring url) {
     strcpy(stream_url, purl);
     (*env)->ReleaseStringUTFChars(env, url, purl);
 
-    strcpy(stream_url, "/sdcard/ffmpeg/test_out.flv");
+    strcpy(stream_url, "/sdcard/ztest_out2.flv");
     LOGI("startPusher, url: %s", stream_url);
     pthread_t tid;
     pthread_create(&tid, NULL, main_loop, stream_url);
@@ -214,33 +250,15 @@ static void fireData(JNIEnv *env, jbyteArray data, jint len, int fd) {
 DEFINE_API(void, fireVideo)(JNIEnv *env, jobject thiz, jbyteArray data, jint len) {
     if (s_status != E_START)
         return;
-    return;
 
-    int fd = initPipe(&s_wpipe[E_VIDEO], FIFO_VIDEO, O_WRONLY);
-    if (fd <= 0)
+    int fd = initPipe(&s_pipe[E_VIDEO], FIFO_VIDEO);
+    if (fd <= 0) {
+        LOGE("fireVideo: cannot initPipe");
         return;
-
-    static int volatile firstVideo = 1;
-    if (firstVideo) {
-        firstVideo = 0;
-
-#define Y4M_LINE_MAX 256
-#define Y4M_MAGIC "YUV4MPEG2"
-#define Y4M_FRAME_MAGIC "FRAME"
-#define MAX_FRAME_HEADER 80
-
-        int width=640, height=480;
-        int raten=20, rated=1;
-        int aspectn=0, aspectd=0;
-        char inter = 'p';
-        const char *colorspace = " C420jpeg XYSCSS=420JPEG";
-
-        char buf[Y4M_LINE_MAX] = {0};
-        int n = snprintf(buf, Y4M_LINE_MAX, "%s W%d H%d F%d:%d I%c A%d:%d%s\n",
-                Y4M_MAGIC, width, height, raten, rated, inter,
-                aspectn, aspectd, colorspace);
-        write(fd, buf, strlen(buf));
     }
+
+    LOGI("fireVideo, len=%d", len);
+    write_y4m_header(fd);
 
     char frame[MAX_FRAME_HEADER] = {0};
     snprintf(frame, MAX_FRAME_HEADER, "%s\n", Y4M_FRAME_MAGIC);
@@ -252,20 +270,20 @@ DEFINE_API(void, fireAudio)(JNIEnv *env, jobject thiz, jbyteArray data, jint len
     if (s_status != E_START)
         return;
 
-    int fd = initPipe(&s_wpipe[E_AUDIO], FIFO_AUDIO, O_WRONLY);
-    if (fd > 0) {
-        fireData(env, data, len, fd);
+    int fd = initPipe(&s_pipe[E_AUDIO], FIFO_AUDIO);
+    if (fd <= 0) {
+        LOGE("fireAudio: cannot initPipe");
+        return;
     }
+
+    fireData(env, data, len, fd);
 }
 
 DEFINE_API(void, release)(JNIEnv *env, jobject thiz) {
     Java_com_zenvv_live_jni_PusherNative_stopPusher(env, thiz);
 
-    closePipe(&s_rpipe[E_AUDIO]);
-    closePipe(&s_rpipe[E_VIDEO]);
-
-    closePipe(&s_wpipe[E_AUDIO]);
-    closePipe(&s_wpipe[E_VIDEO]);
+    closePipe(&s_pipe[E_VIDEO]);
+    closePipe(&s_pipe[E_AUDIO]);
 }
 
 void ffmpeg_once() {
