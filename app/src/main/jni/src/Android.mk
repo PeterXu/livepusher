@@ -9,14 +9,10 @@ ifeq ($(TARGET_ARCH_ABI), armeabi-v7a)
 endif
 
 LOCAL_SRC_FILES :=  \
-	cmdutils.c \
-	ffmpeg_opt.c \
-	ffmpeg_filter.c \
-	ffmpeg.c \
-	queue.c \
-	japi.c
+	proto.cc \
+	japi.cc
 	
-LOCAL_CFLAGS := -std=c99 -fPIC
+LOCAL_CFLAGS := -fPIC -D__STDC_CONSTANT_MACROS
 LOCAL_LDLIBS := -Wl,--no-warn-shared-textrel -llog -lz
 
 LOCAL_SHARED_LIBRARIES := ffmpeg x264 openh264

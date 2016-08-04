@@ -15,8 +15,16 @@
 #include <cpu-features.h>
 #include <android/log.h>
 
-#include "libavutil/log.h"
+#ifdef __cplusplus
+extern "C" {
+#endif
+#include "libavformat/avformat.h"
+#include "libavfilter/avfilter.h"
 #include "libavformat/url.h"
+#include "libavutil/log.h"
+#ifdef __cplusplus
+}
+#endif
 
 #define TAG "NDK1"
 
@@ -34,23 +42,18 @@
 #define MAX_PATH 260
 #endif
 
-#define FIFO_AUDIO "/sdcard/ffmpeg/zunix_audio"
-#define FIFO_VIDEO "/sdcard/ffmpeg/zunix_video"
 
-extern int      create_queue();
-extern int      destroy_queue();
-
-extern int      queue_size();
-extern int      queue_append_last(void *pval);
-extern void*    queue_get_first();
-extern int      queue_delete_first();
+enum {
+    E_AUDIO = 0,
+    E_VIDEO = 1,
+};
 
 typedef struct packet_t {
     int len;
+    int type;
     char data[1];
 }packet_t;
 
-extern void ffmpeg_cleanup(int ret);
 
 #endif
 
