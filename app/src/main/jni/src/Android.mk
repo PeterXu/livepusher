@@ -13,7 +13,7 @@ LOCAL_SRC_FILES :=  \
 	ffmpeg_opt.c \
 	ffmpeg_filter.c \
 	ffmpeg.c \
-	unix.c \
+	queue.c \
 	japi.c
 	
 LOCAL_CFLAGS := -std=c99 -fPIC

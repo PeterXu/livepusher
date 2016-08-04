@@ -1,8 +1,22 @@
 #ifndef _COMMON_H_
 #define _COMMON_H_
 
+#include <unistd.h>
+#include <string.h>
+#include <fcntl.h>
+#include <errno.h>
+#include <stdio.h>
+#include <pthread.h>
+#include <sys/un.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <sys/socket.h>
 
+#include <cpu-features.h>
 #include <android/log.h>
+
+#include "libavutil/log.h"
+#include "libavformat/url.h"
 
 #define TAG "NDK1"
 
@@ -20,11 +34,23 @@
 #define MAX_PATH 260
 #endif
 
-#define FIFO_AUDIO "/data/ffmpeg/zunix_audio"
-#define FIFO_VIDEO "/data/ffmpeg/zunix_video"
+#define FIFO_AUDIO "/sdcard/ffmpeg/zunix_audio"
+#define FIFO_VIDEO "/sdcard/ffmpeg/zunix_video"
 
-int initPipe(int *fd, const char *fname);
-void closePipe(int *fd);
+extern int      create_queue();
+extern int      destroy_queue();
+
+extern int      queue_size();
+extern int      queue_append_last(void *pval);
+extern void*    queue_get_first();
+extern int      queue_delete_first();
+
+typedef struct packet_t {
+    int len;
+    char data[1];
+}packet_t;
+
+extern void ffmpeg_cleanup(int ret);
 
 #endif
 

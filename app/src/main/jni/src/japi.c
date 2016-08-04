@@ -1,17 +1,6 @@
 #include <jni.h>
-#include <stdio.h>
-#include <pthread.h>
-#include <cpu-features.h>
 
-#include <unistd.h>
-#include <string.h>
-#include <fcntl.h>
-#include <sys/stat.h>
-#include <errno.h>
-
-#include "libavutil/log.h"
 #include "common.h"
-
 
 #ifndef DEFINE_API
 #define DEFINE_API(v, f) JNIEXPORT v JNICALL Java_com_zenvv_live_jni_PusherNative_##f
@@ -24,11 +13,6 @@ enum {
 };
 
 enum {
-    E_I420 = 0,
-    E_NV21,
-};
-
-enum {
     E_INIT = 0,
     E_START,
     E_STOP,
@@ -37,9 +21,21 @@ enum {
 
 static char s_iopts[2][32][MAX_PATH] = {{{"\0"}}};
 static char s_eopts[2][32][MAX_PATH] = {{{"\0"}}};
-static volatile int s_pipe[2] = {-1, -1};
-static volatile int s_status = E_INIT;
 
+static volatile int s_status = E_INIT;
+static pthread_cond_t s_cond = PTHREAD_COND_INITIALIZER;
+static pthread_mutex_t s_mutex = PTHREAD_MUTEX_INITIALIZER;
+
+extern URLProtocol ff_unix_protocol;
+
+typedef struct UnixContext {
+    const AVClass *class;
+    struct sockaddr_un addr;
+    int timeout;
+    int listen;
+    int type;
+    int fd;
+} UnixContext;
 
 static void setOptions(char *str, char oopts[][MAX_PATH]) {
     int argc = 0;
@@ -143,7 +139,7 @@ void get_options(int *pargc, char *argv[], char *url) {
     LOGI("==> %s", tmpstr);
 }
 
-void *main_loop(void *param) {
+void *ff_loop(void *param) {
     if (!param)
         return NULL;
 
@@ -152,7 +148,7 @@ void *main_loop(void *param) {
     memset(argv, 0, 128*sizeof(char *));
     get_options(&argc, argv, (char *)param);
 
-    LOGI("main_loop: run ...");
+    LOGI("ff_loop: run ...");
     s_status = E_START;
     extern int ffmpeg_main(int argc, char **argv);
     ffmpeg_main(argc, (char **)argv);
@@ -161,7 +157,61 @@ void *main_loop(void *param) {
         if (argv[k]) free(argv[k]);
     }
 
-    LOGI("main_loop: exit");
+    LOGI("ff_loop: exit");
+    pthread_exit(0);
+}
+
+void *net_loop(void *param) {
+    // init unix protocol with server mode
+    UnixContext ctx;
+    memset(&ctx, 0, sizeof(UnixContext));
+    ctx.listen = 1;
+    ctx.type = SOCK_STREAM;
+
+    URLContext ff_context;
+    memset(&ff_context, 0, sizeof(URLContext));
+    ff_context.priv_data = &ctx;
+    ff_context.flags = 0;
+
+    s_status = E_START;
+
+    LOGI("net_loop begin");
+
+    do {
+        int ret = ff_unix_protocol.url_open(&ff_context, FIFO_VIDEO, 0);
+        if (ret < 0) {
+            LOGE("net_loop, url_open fail ret=%d", ret);
+            break;
+        }
+
+        LOGI("net_loop, recv one connection");
+        do {
+            pthread_mutex_lock(&s_mutex);
+            pthread_cond_wait(&s_cond, &s_mutex);
+            if (s_status != E_START) {
+                pthread_mutex_unlock(&s_mutex);
+                break;
+            }
+
+            packet_t *pkt = queue_get_first();
+            if (pkt) {
+                queue_delete_first();
+            }
+            pthread_mutex_unlock(&s_mutex);
+
+            if (pkt) {
+                ret = ff_unix_protocol.url_write(&ff_context, pkt->data, pkt->len);
+                LOGI("net_loop, url_write ret=%d", ret);
+                free(pkt);
+            }
+        } while(1);
+
+        ff_unix_protocol.url_close(&ff_context);
+    }while(s_status == E_START);
+
+    destroy_queue();
+
+    LOGI("net_loop exit");
     pthread_exit(0);
 }
 
@@ -169,6 +219,11 @@ DEFINE_API(void, startPusher)(JNIEnv *env, jobject thiz, jstring url) {
     if (s_status == E_START) 
         return;
 
+    create_queue();
+    pthread_t tid1;
+    pthread_create(&tid1, NULL, net_loop, NULL);
+
+#if 0
     static char stream_url[1024] = {0};
     const char *purl = (*env)->GetStringUTFChars(env, url, 0);
     strcpy(stream_url, purl);
@@ -177,66 +232,56 @@ DEFINE_API(void, startPusher)(JNIEnv *env, jobject thiz, jstring url) {
     strcpy(stream_url, "/sdcard/ztest_out2.flv");
     LOGI("startPusher, url: %s", stream_url);
     pthread_t tid;
-    //pthread_create(&tid, NULL, main_loop, stream_url);
-    s_status = E_START;
+    pthread_create(&tid, NULL, ff_loop, stream_url);
+#endif
 }
 
 DEFINE_API(void, stopPusher)(JNIEnv *env, jobject thiz) {
     if (s_status != E_START)
         return;
+    s_status = E_STOP;
 
     LOGI("stopPusher, begin");
-    extern void ffmpeg_cleanup(int ret);
-    ffmpeg_cleanup(0);
-    s_status = E_STOP;
-    LOGI("stopPusher, end");
-}
+    pthread_mutex_lock(&s_mutex);
+    pthread_cond_signal(&s_cond);
+    pthread_mutex_unlock(&s_mutex);
 
-static void fireData(JNIEnv *env, jbyteArray data, jint len, int fd) {
-    jbyte* buffer = (*env)->GetByteArrayElements(env, data, 0);
-    write(fd, buffer, len);
-    (*env)->ReleaseByteArrayElements(env, data, buffer, 0);
+    ffmpeg_cleanup(0);
+    LOGI("stopPusher, end");
 }
 
 DEFINE_API(void, fireVideo)(JNIEnv *env, jobject thiz, jbyteArray data, jint len) {
     if (s_status != E_START)
         return;
 
-    int fd = initPipe(&s_pipe[E_VIDEO], FIFO_VIDEO);
-    if (fd <= 0) {
-        LOGE("fireVideo: cannot initPipe");
-        return;
-    }
-
-    write_y4m_header(fd);
-
     LOGI("fireVideo, len=%d", len);
-    char frame[MAX_FRAME_HEADER] = {0};
-    snprintf(frame, MAX_FRAME_HEADER, "%s\n", Y4M_FRAME_MAGIC);
-    write(fd, frame, strlen(frame));
+    char* buffer = malloc(len+16);
+    memset(buffer, 0, len+16);
+    packet_t *pkt = (packet_t *)buffer;
 
-    jbyte* buffer = (*env)->GetByteArrayElements(env, data, 0);
-    write(fd, buffer, len);
-    (*env)->ReleaseByteArrayElements(env, data, buffer, 0);
+    int ret = sprintf(pkt->data, "%s\n", Y4M_FRAME_MAGIC);
+    jbyte* bytes = (*env)->GetByteArrayElements(env, data, 0);
+    memcpy(pkt->data+ret, bytes, len);
+    (*env)->ReleaseByteArrayElements(env, data, bytes, 0);
+    pkt->len = ret + len;
+    
+    //fireData(env, data, len, fd);
+    pthread_mutex_lock(&s_mutex);
+    if (s_status == E_START) {
+        queue_append_last(pkt);
+    }
+    pthread_cond_signal(&s_cond);
+    pthread_mutex_unlock(&s_mutex);
 }
 DEFINE_API(void, fireAudio)(JNIEnv *env, jobject thiz, jbyteArray data, jint len) {
     if (s_status != E_START)
         return;
 
-    int fd = initPipe(&s_pipe[E_AUDIO], FIFO_AUDIO);
-    if (fd <= 0) {
-        LOGE("fireAudio: cannot initPipe");
-        return;
-    }
-
-    fireData(env, data, len, fd);
+    //fireData(env, data, len, fd);
 }
 
 DEFINE_API(void, release)(JNIEnv *env, jobject thiz) {
     Java_com_zenvv_live_jni_PusherNative_stopPusher(env, thiz);
-
-    closePipe(&s_pipe[E_VIDEO]);
-    closePipe(&s_pipe[E_AUDIO]);
 }
 
 static void ffmpeg_once() {
