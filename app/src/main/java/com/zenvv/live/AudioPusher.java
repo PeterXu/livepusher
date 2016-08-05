@@ -26,7 +26,7 @@ public class AudioPusher extends Pusher {
 		audioRecord = new AudioRecord(MediaRecorder.AudioSource.MIC,
 				mParam.getSampleRate(), channel, pcmBits, minBufferSize);
 
-		String inOpts = "-f s16le -ar 44.1k -ac 1";
+		String inOpts = "-f u16le -ar 44.1k -ac 1";
 		String encOpts = "-acodec aac -ar 44.1k -ac 1 -ab 32k -strict -2";
 		mNative.setAudioOptions(inOpts, encOpts);
 	}
@@ -83,7 +83,7 @@ public class AudioPusher extends Pusher {
 					&& audioRecord.getRecordingState() == AudioRecord.RECORDSTATE_RECORDING) {
 				int len = audioRecord.read(buffer, 0, buffer.length);
 				if (0 < len) {
-					mNative.fireAudio(buffer, len);
+					//mNative.fireAudio(buffer, len);
 				}
 			}
 			buffer = null;

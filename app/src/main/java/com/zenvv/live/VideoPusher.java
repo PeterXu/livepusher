@@ -175,9 +175,11 @@ public class VideoPusher extends Pusher implements Callback, PreviewCallback {
 		}
 
         Log.d(TAG, "setPreviewOrientation, screen=" + mScreen + ", width=" + width + ", height=" + height);
-		String inOpts = String.format("-s %dx%d -pix_fmt yuv420p", width, height);
-		String encOpts = "-vcodec libx264 -vprofile baseline -pass 1 -maxrate 640k -minrate 128k -framerate 20 -g 20";
-        mNative.setVideoOptions(inOpts, encOpts);
+		String inOpts = String.format("-f yuv4mpegpipe");
+		String encOpts = "";
+		encOpts += "-pix_fmt yuv420p -vcodec libx264 -vprofile baseline -maxrate 640k -minrate 128k -framerate 20 -g 20";
+		encOpts += String.format(" -s %dx%d", width, height);
+		mNative.setVideoOptions(inOpts, encOpts);
 		
 		int result;
 		CameraInfo info = new CameraInfo();
