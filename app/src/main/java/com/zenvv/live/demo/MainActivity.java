@@ -28,7 +28,7 @@ public class MainActivity extends Activity implements
 	private final static String TAG = "MainActivity";
 
 	private final static String URI = "rtmp://v.sportsdata.cn/app";
-	//private final static String URI = "http://v.sportsdata.cn/app";
+	private final static String URI2 = "http://v.sportsdata.cn/srs/app";
 
 	private Button mStartBtn;
 	private SurfaceHolder mHolder;
@@ -91,11 +91,14 @@ public class MainActivity extends Activity implements
 
         mRecordCtrl = (CheckBox) findViewById(R.id.record_channel);
         mRecordCtrl.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
-             @Override
-             public void onCheckedChanged(CompoundButton arg0, boolean arg1) {
-                 mRecordChannel = arg1;
-             }
-         });
+			@Override
+			public void onCheckedChanged(CompoundButton arg0, boolean arg1) {
+				mRecordChannel = arg1;
+			}
+		});
+
+		EditText channel = (EditText)findViewById(R.id.live_channel);
+		channel.setText("test");
 		
 		livePusher = new LivePusher(this, 640, 480, 768*1024, 20, CameraInfo.CAMERA_FACING_FRONT);
 		livePusher.setLiveStateListener(this);
@@ -152,7 +155,7 @@ public class MainActivity extends Activity implements
         }else {
 		    mUrl = URI + "/" + channel;
         }
-		tv.setText(mUrl);
+		tv.setText(mUrl + "\n" + URI2 + "/" + channel);
 	}
 
 	public void onClickStart(View v) {
