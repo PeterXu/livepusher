@@ -34,19 +34,11 @@ public class PusherNative {
 		}
 	}
 
-	public native void setVideoOptions(int width, int height, int bitrate, int fps);
-
-	public native void setAudioOptions(int sampleRate, int channel, int bitrate);
-
-	public native void fireVideo(byte[] buffer);
-
-	public native void fireAudio(byte[] buffer, int len);
-
-	public native int getInputSamples();
-
-	public native boolean startPusher(String url);
-
-	public native void stopPusher();
-
+	public native void setVideoOptions(String inOpts, String encOpts);
+	public native void setAudioOptions(String inOpts, String encOpts);
+    public native void startPusher(String url);
+    public native void stopPusher();
+    public native void fireVideo(byte[] buffer, int len);
+    public native void fireAudio(byte[] buffer, int len);
 	public native void release();
 }

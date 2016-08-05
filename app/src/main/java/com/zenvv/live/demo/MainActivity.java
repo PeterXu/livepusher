@@ -96,6 +96,9 @@ public class MainActivity extends Activity implements
                  mRecordChannel = arg1;
              }
          });
+
+		EditText channel = (EditText)findViewById(R.id.live_channel);
+		channel.setText("test");
 		
 		livePusher = new LivePusher(this, 640, 480, 768*1024, 20, CameraInfo.CAMERA_FACING_FRONT);
 		livePusher.setLiveStateListener(this);
