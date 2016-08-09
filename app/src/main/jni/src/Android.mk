@@ -9,7 +9,7 @@ ifeq ($(TARGET_ARCH_ABI), armeabi-v7a)
 endif
 
 LOCAL_SRC_FILES :=  \
-	proto.cc \
+	proto.c \
 	japi.cc
 	
 LOCAL_CFLAGS := -fPIC -D__STDC_CONSTANT_MACROS

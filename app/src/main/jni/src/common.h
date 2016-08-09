@@ -18,6 +18,7 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
+#include "config.h"
 #include "libavformat/avformat.h"
 #include "libavfilter/avfilter.h"
 #include "libavformat/url.h"
