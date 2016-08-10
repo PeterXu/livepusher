@@ -5,46 +5,10 @@
 #include "ffaudioparam.h"
 
 
-///
-/// @brief  The video/audio encoder class for wrapping FFmpeg encoding API.
-///
 class FF_EXPORT FFEncoder
 {
 public:
-    //////////////////////////////////////////////////////////////////////////
-    //
-    //  Initialization and finalization
-    //
-    //////////////////////////////////////////////////////////////////////////
-
-    ///
-    /// @brief  Constructor for initializing an object of FFEncoder.
-    ///
-    /// If A/V stream is not needed, pass an empty FFVideoParam/FFAudioParam directly.
-    /// For example, the following codes create a "flv" encoder with audio only:
-    /// @verbatim
-    ///     FFVideoParam videoParam;
-    ///     FFAudioParam audioParam(64000, 44100, 2);
-    ///     FFEncoder testVideo(videoParam, audioParam);
-    ///         testVideo.open("test.flv");
-    ///         //... codes go here
-    ///         testVideo.close();
-    /// @endverbatim
-    ///
-    /// If no output, A/V codec must be specified in the FFVideoParam/FFAudioParam.
-    /// For example:
-    /// @verbatim
-    ///     FFVideoParam videoParam(352, 288, PIX_FMT_YUV420P, 400000, 25, "flv");
-    ///     FFAudioParam audioParam(64000, 44100, 2, "libmp3lame");
-    ///     FFEncoder testVideo(videoParam, audioParam);
-    ///         testVideo.open();
-    ///         //... codes go here
-    ///         testVideo.close();
-    /// @endverbatim
-    ///
-    /// @param  [in] videoParam   The video parameters to initialize the FFEncoder.
-    /// @param  [in] audioParam   The audio parameters to initialize the FFEncoder.
-    ///
+    // video and audio
     FFEncoder(const FFVideoParam &videoParam, const FFAudioParam &audioParam);
 
     // only video
@@ -53,19 +17,10 @@ public:
     // only audio
     FFEncoder(const FFAudioParam &audioParam);
 
-    ///
-    /// @brief  Destructor
-    ///
     virtual ~FFEncoder();
 
 
 public:
-    //////////////////////////////////////////////////////////////////////////
-    //
-    //  Public properties
-    //
-    //////////////////////////////////////////////////////////////////////////
-
     ///
     /// @brief  Get the video buffer which contains the encoded frame data.
     ///
@@ -134,12 +89,6 @@ public:
 
 
 public:
-    //////////////////////////////////////////////////////////////////////////
-    //
-    //  Public Methods
-    //
-    //////////////////////////////////////////////////////////////////////////
-
     ///
     /// @brief  Open the codec, output file and allocate the necessary internal structures.
     ///
@@ -168,8 +117,6 @@ public:
     ///
     int encodeVideoFrame(const uint8_t *frameData, PixelFormat format, int width, int height);
 
-    static int convertPixFmt(const uint8_t *src, int srclen, int srcw, int srch, PixelFormat srcfmt, 
-            uint8_t *dst, int dstlen, int dstw, int dsth, PixelFormat dstfmt);
 
     ///
     /// @brief  Encode one audio frame (just encode, won't write encoded data to output file).
@@ -210,12 +157,6 @@ private:
     int     audioBufferSize;    ///< The size of audio output buffer
 
 private:
-    //////////////////////////////////////////////////////////////////////////
-    //
-    //  Private Methods
-    //
-    //////////////////////////////////////////////////////////////////////////
-
     // init parameters for encode
     void init();
 
@@ -228,17 +169,6 @@ private:
     ///
     int encodeVideoData(AVPicture *picture, FFVideoParam &inParam);
 
-    ///
-    /// @brief  Convert the pixel format of the input image
-    ///
-    /// @param  [in]  srcParam    The parameters of the source image picture
-    /// @param  [in]  dstContext  The codec context of the output (destination) image picture
-    /// @param  [in]  srcPic      The source image picture to be converted
-    /// @param  [out] dstPic      Return the output image picture which has been converted
-    ///
-    /// @return 0 when conversion is successful, otherwise a negative int
-    ///
-    static int convertPixFmt(AVPicture *srcPic, AVPicture *dstPic, const FFVideoParam *srcParam, const FFVideoParam *dstParam);
 
     ///
     /// @brief  Encode an audio frame to the internal encoded data buffer

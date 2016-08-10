@@ -4,6 +4,7 @@ include $(CLEAR_VARS)
 LOCAL_MODULE := ffcodec
 
 LOCAL_SRC_FILES:= \
+	ffutil.cpp \
 	ffdecoder.cpp \
 	ffencoder.cpp
 
