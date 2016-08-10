@@ -167,7 +167,7 @@ private:
     ///
     /// @return A non-negative int represents the size of the encoded data
     ///
-    int encodeVideoData(AVPicture *picture, FFVideoParam &inParam);
+    int encodeVideoData(const AVFrame *frame, const FFVideoParam &param);
 
 
     ///

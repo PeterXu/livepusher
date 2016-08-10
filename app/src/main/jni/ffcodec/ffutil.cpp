@@ -20,7 +20,7 @@ int FFUtil::convertPixFmt(AVFrame *srcFrame, AVFrame *dstFrame,
     return (dstHeight == dstParam.height) ? 0 : -1;
 }
 
-static AVFrame *av_frame_with_buffer(PixelFormat fmt, int width, int height) {
+AVFrame *FFUtil::allocAVFrameWithBuffer(PixelFormat fmt, int width, int height) {
     AVFrame *frame = av_frame_alloc();
     frame->format = fmt;
     frame->height = width;
@@ -33,7 +33,22 @@ static AVFrame *av_frame_with_buffer(PixelFormat fmt, int width, int height) {
     return frame;
 }
 
-int FFUtil::convertPixFmt(const uint8_t *src, int srclen, int srcw, int srch, PixelFormat srcfmt, 
+AVFrame *FFUtil::allocAVFrameWithBuffer(const FFVideoParam &param) {
+    return allocAVFrameWithBuffer(param.pixelFormat, param.width, param.height);
+}
+
+int FFUtil::fillAVFrameData(AVFrame *frame, const uint8_t *src, int srcLen, const FFVideoParam &param) {
+    return av_image_fill_arrays(frame->data, frame->linesize, src, 
+            param.pixelFormat, param.width, param.height, 0);
+}
+
+int FFUtil::copyAVFrameData(const AVFrame *frame, uint8_t *dst, int dstLen, const FFVideoParam &param) {
+    return av_image_copy_to_buffer(dst, dstLen, frame->data, frame->linesize, 
+                param.pixelFormat, param.width, param.height, 0);
+}
+
+int FFUtil::convertPixFmt(
+        const uint8_t *src, int srclen, int srcw, int srch, PixelFormat srcfmt, 
         uint8_t *dst, int dstlen, int dstw, int dsth, PixelFormat dstfmt)
 {
     if (!src || !dst) {
@@ -44,35 +59,35 @@ int FFUtil::convertPixFmt(const uint8_t *src, int srclen, int srcw, int srch, Pi
     int ret = -1;
     AVFrame *srcFrame = NULL;
     AVFrame *dstFrame = NULL;
+
+    FFVideoParam srcParam(srcw, srch, srcfmt, 0, 0, "");
+    FFVideoParam dstParam(dstw, dsth, dstfmt, 0, 0, "");
+
     do {
-        srcFrame = av_frame_with_buffer(srcfmt, srcw, srch);
+        srcFrame = allocAVFrameWithBuffer(srcParam);
         if (!srcFrame) {
             LOGE("[%s] fail to get src frame buffer", __FUNCTION__);
             break;
         }
 
-        ret = av_image_fill_arrays(srcFrame->data, srcFrame->linesize, 
-                src, srcfmt, srcw, srch, 0);
+        ret = fillAVFrameData(srcFrame, src, srclen, srcParam);
         if (ret < 0) {
             LOGE("[%s] fail to fill src frame", __FUNCTION__);
             break;
         }
 
-        dstFrame = av_frame_with_buffer(dstfmt, dstw, dsth);
+        dstFrame = allocAVFrameWithBuffer(dstParam);
         if (!dstFrame) {
             LOGE("[%s] fail to get dst frame buffer", __FUNCTION__);
             break;
         }
 
-        FFVideoParam srcParam(srcw, srch, srcfmt, 0, 0, "");
-        FFVideoParam dstParam(dstw, dsth, dstfmt, 0, 0, "");
         if (convertPixFmt(srcFrame, dstFrame, srcParam, dstParam) < 0){
             LOGE("[%s] fail to convertPixFmt", __FUNCTION__);
             break;
         }
 
-        ret = av_image_copy_to_buffer(dst, dstlen, dstFrame->data, dstFrame->linesize, 
-                dstfmt, dstw, dsth, 1);
+        ret = copyAVFrameData((const AVFrame *)dstFrame, dst, dstlen, dstParam);
     }while(0);
 
     av_frame_free(&srcFrame);

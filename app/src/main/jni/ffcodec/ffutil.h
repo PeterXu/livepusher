@@ -22,6 +22,11 @@ public:
     static int convertPixFmt(const uint8_t *src, int srclen, int srcw, int srch, PixelFormat srcfmt, 
             uint8_t *dst, int dstlen, int dstw, int dsth, PixelFormat dstfmt);
 
+    static AVFrame *allocAVFrameWithBuffer(PixelFormat fmt, int width, int height);
+    static AVFrame *allocAVFrameWithBuffer(const FFVideoParam &param);
+
+    static int fillAVFrameData(AVFrame *frame, const uint8_t *src, int srcLen, const FFVideoParam &param);
+    static int copyAVFrameData(const AVFrame *frame, uint8_t *dst, int dstLen, const FFVideoParam &param);
 };
 
 

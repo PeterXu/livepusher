@@ -1,12 +1,9 @@
 #include "ffencoder.h"
+#include "ffutil.h"
 #include "logtrace.h"
 
 // define the max audio packet size as 128 KB
 #define MAX_AUDIO_PACKET_SIZE (128 * 1024)
-
-#ifndef snprintf
-#define snprintf _snprintf
-#endif
 
 
 FFEncoder::FFEncoder(const FFVideoParam &vp, const FFAudioParam &ap) : 
@@ -68,8 +65,7 @@ const uint8_t *FFEncoder::getVideoEncodedBuffer() const
 
 double FFEncoder::getVideoTimeStamp() const
 {
-    if (!this->opened || !this->encodeVideo)
-    {
+    if (!this->opened || !this->encodeVideo) {
         return 0;
     }
     //return (double)this->videoStream->pts.val * this->videoStream->time_base.num / this->videoStream->time_base.den;
@@ -87,90 +83,57 @@ int FFEncoder::getVideoFrameSize() const
     {
         return 0;
     }
-    //return avpicture_get_size(this->videoParam.pixelFormat, this->videoParam.width, this->videoParam.height);
-    return 0;
+    return av_image_get_buffer_size(this->videoParam.pixelFormat, this->videoParam.width, this->videoParam.height, 0);
 }
 
-int FFEncoder::encodeVideoFrame(const uint8_t *frameData, PixelFormat format, int width, int height)
+int FFEncoder::encodeVideoFrame(const uint8_t *data, PixelFormat format, int width, int height)
 {
-    if (!this->opened)
-    {
+    if (!this->opened || !this->encodeVideo) {
         return -1;
     }
 
-    if (!this->encodeVideo)
-    {
-        return -1;
-    }
-
-    // set input video param
     FFVideoParam inParam(width, height, format, 0, 0, "");
-
-    // encode the image frame
-    AVPicture picture;
-#if 0
-    if(avpicture_fill(&picture, (uint8_t *)frameData, inParam.pixelFormat, inParam.width, inParam.height) == -1) 
-    {
-        return -1;
-    }
-#endif
-
-    return this->encodeVideoData(&picture, inParam);
-}
-
-// private method 
-int FFEncoder::encodeVideoData(AVPicture *picture, FFVideoParam &picParam)
-{
-    AVCodecContext *videoCodecContext = this->videoStream->codec;
-
-    //AVFrame *frame = avcodec_alloc_frame();
-    AVFrame *frame = NULL;
-    if (!frame)
-    {
+    AVFrame *frame = FFUtil::allocAVFrameWithBuffer(inParam);
+    if (!frame) {
         return -1;
     }
 
-    // convert the pixel format if needed
-    if (picParam.pixelFormat != videoCodecContext->pix_fmt ||
-            picParam.width != videoCodecContext->width ||
-            picParam.height != videoCodecContext->height)
-    {
-        LOGE("FFEncoder::encodeVideoData, VideoParam match error");
+    int ret = FFUtil::fillAVFrameData(frame, data, 0, inParam);
+    if(ret <= 0) {
+        av_frame_free(&frame);
         return -1;
-    }
-    else
-    {
-        // fill the frame
-        *(AVPicture *)frame = *picture;
     }
 
     frame->pts = AV_NOPTS_VALUE;
-
-    // encode the frame
-    //int encodedSize = avcodec_encode_video(videoCodecContext, this->videoBuffer, this->videoBufferSize, frame);
-    int encodedSize = 0;
-
-    av_free(frame);
-
-    if (encodedSize < 0)
-    {
-        return -1;
-    }
-    else
-    {
-        return encodedSize;
-    }
+    ret = this->encodeVideoData(frame, inParam);
+    av_frame_free(&frame);
+    return ret;
 }
 
+int FFEncoder::encodeVideoData(const AVFrame *frame, const FFVideoParam &param)
+{
+    AVCodecContext *avctx = this->videoStream->codec;
 
-// private method
+    // convert the pixel format if needed
+    if (param.pixelFormat != avctx->pix_fmt ||
+        param.width != avctx->width || param.height != avctx->height) {
+        LOGE("FFEncoder::encodeVideoData, VideoParam match error");
+        return -1;
+    }
 
+    AVPacket *avpkt = av_packet_alloc();
+    av_init_packet(avpkt);
 
-//////////////////////////////////////////////////////////////////////////
-//
-//  Methods For Audio
-//
-//////////////////////////////////////////////////////////////////////////
+    int got_pkt = 0;
+    int encodedSize = avcodec_encode_video2(avctx, avpkt, frame, &got_pkt);
+    if (encodedSize < 0) {
+        return -1;
+    }
+
+    av_packet_unref(avpkt);
+
+    return encodedSize;
+}
 
 const uint8_t *FFEncoder::getAudioEncodedBuffer() const
 {

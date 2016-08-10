@@ -26,6 +26,9 @@ extern "C"
 #define avcodec_alloc_frame     av_alloc_frame
 #define avcodec_encode_video    avcodec_encode_video2
 
+#ifndef snprintf
+#define snprintf _snprintf
+#endif
 
 #ifdef FF_DLL // for win32 dll
 #ifdef DLL_FILE
