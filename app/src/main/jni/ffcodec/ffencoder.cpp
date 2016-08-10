@@ -44,6 +44,8 @@ void FFEncoder::init()
     this->encodeAudio = this->audioParam.isValid();
 
     // initialize libavcodec, and register all codecs and formats
+    avcodec_register_all();
+    avfilter_register_all();
     av_register_all();
 }
 

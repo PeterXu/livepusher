@@ -7,6 +7,7 @@ extern "C"
 {
 //#define INT64_C
 #define __STDC_LIMIT_MACROS
+#include "libavfilter/avfilter.h"
 #include "libavformat/avformat.h"
 #include "libswscale/swscale.h"
 #include "libavutil/imgutils.h"

@@ -36,48 +36,48 @@ static AVFrame *av_frame_with_buffer(PixelFormat fmt, int width, int height) {
 int FFUtil::convertPixFmt(const uint8_t *src, int srclen, int srcw, int srch, PixelFormat srcfmt, 
         uint8_t *dst, int dstlen, int dstw, int dsth, PixelFormat dstfmt)
 {
-    int ret = 0;
     if (!src || !dst) {
         LOGE("[%s] src or dst is NULL", __FUNCTION__);
         return -1;
     }
 
-    // src input frame
-    AVFrame *srcFrame = av_frame_with_buffer(srcfmt, srcw, srch);
-    if (!srcFrame) {
-        LOGE("[%s] fail to get frame buffer", __FUNCTION__);
-        return -1;
-    }
+    int ret = -1;
+    AVFrame *srcFrame = NULL;
+    AVFrame *dstFrame = NULL;
+    do {
+        srcFrame = av_frame_with_buffer(srcfmt, srcw, srch);
+        if (!srcFrame) {
+            LOGE("[%s] fail to get src frame buffer", __FUNCTION__);
+            break;
+        }
 
-    FFVideoParam srcParam(srcw, srch, srcfmt, 0, 0, "");
-    int ret = av_image_fill_arrays(srcFrame->data, srcFrame->linesize, 
-            src, srcParam.pixelFormat, srcParam.width, srcParam.height, 0);
-    if (ret < 0) {
-        LOGE("[%s] fail to fill src frame", __FUNCTION__);
-        av_frame_free(&srcFrame);
-        return -1;
-    }
+        ret = av_image_fill_arrays(srcFrame->data, srcFrame->linesize, 
+                src, srcfmt, srcw, srch, 0);
+        if (ret < 0) {
+            LOGE("[%s] fail to fill src frame", __FUNCTION__);
+            break;
+        }
 
-    // dst output frame
-    AVFrame *dstFrame = av_frame_alloc();
+        dstFrame = av_frame_with_buffer(dstfmt, dstw, dsth);
+        if (!dstFrame) {
+            LOGE("[%s] fail to get dst frame buffer", __FUNCTION__);
+            break;
+        }
 
-    FFVideoParam dstParam(dstw, dsth, dstfmt, 0, 0, "");
-    ret = av_image_fill_arrays(dstFrame->data, dstFrame->linesize, 
-            dst, dstParam.pixelFormat, dstParam.width, dstParam.height, 0);
-    if (ret < 0) {
-        LOGE("[%s] fail to fill dst frame", __FUNCTION__);
-        av_frame_free(&dstFrame);
-        return -1;
-    }
+        FFVideoParam srcParam(srcw, srch, srcfmt, 0, 0, "");
+        FFVideoParam dstParam(dstw, dsth, dstfmt, 0, 0, "");
+        if (convertPixFmt(srcFrame, dstFrame, srcParam, dstParam) < 0){
+            LOGE("[%s] fail to convertPixFmt", __FUNCTION__);
+            break;
+        }
 
-    if (convertPixFmt(srcFrame, dstFrame, srcParam, dstParam) < 0){
-        LOGE("[%s] fail to convertPixFmt", __FUNCTION__);
-        av_frame_free(&dstFrame);
-        return -1;
-    }
+        ret = av_image_copy_to_buffer(dst, dstlen, dstFrame->data, dstFrame->linesize, 
+                dstfmt, dstw, dsth, 1);
+    }while(0);
 
-    ret = av_image_copy_to_buffer(dst, dstlen, dstFrame->data, dstFrame->linesize, 
-            dstParam.pixelFormat, dstParam.width, dstParam.height, 1);
+    av_frame_free(&srcFrame);
+    av_frame_free(&dstFrame);
+
     return ret;
 }
 
