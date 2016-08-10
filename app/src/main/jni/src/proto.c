@@ -247,6 +247,7 @@ void encodeAudioFrame(AVCodecContext *avctx, char *data) {
     pkt.data = NULL;
     pkt.size = 0;
 
+#if 0
     AVFrame *frame = av_frame_alloc();
     int ret = av_image_fill_arrays(frame->data, frame->linesize, data, 0, 0, 0, 0);
     if (ret < 0) {
@@ -261,9 +262,11 @@ void encodeAudioFrame(AVCodecContext *avctx, char *data) {
 
     if (got_packet) {
     }
+#endif
 
 end:
-    if (frame) av_frame_free(&frame);
+    //if (frame) av_frame_free(&frame);
+    return;
 }
 
 void initRtmpProto(URLContext *s, const char* url) {
