@@ -9,6 +9,7 @@ extern "C"
 #define __STDC_LIMIT_MACROS
 #include "libavformat/avformat.h"
 #include "libswscale/swscale.h"
+#include "libavutil/imgutils.h"
 }
 
 #define PIX_FMT_NONE AV_PIX_FMT_NONE
