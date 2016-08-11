@@ -47,6 +47,10 @@ int FFUtil::copyAVFrameData(const AVFrame *frame, uint8_t *dst, int dstLen, cons
                 param.pixelFormat, param.width, param.height, 0);
 }
 
+int FFUtil::getImageBufferSize(const FFVideoParam &param) {
+    return av_image_get_buffer_size(param.pixelFormat, param.width, param.height, 0);
+}
+
 int FFUtil::convertPixFmt(
         const uint8_t *src, int srclen, int srcw, int srch, PixelFormat srcfmt, 
         uint8_t *dst, int dstlen, int dstw, int dsth, PixelFormat dstfmt)

@@ -27,6 +27,7 @@ public:
 
     static int fillAVFrameData(AVFrame *frame, const uint8_t *src, int srcLen, const FFVideoParam &param);
     static int copyAVFrameData(const AVFrame *frame, uint8_t *dst, int dstLen, const FFVideoParam &param);
+    static int getImageBufferSize(const FFVideoParam &param);
 };
 
 

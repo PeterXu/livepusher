@@ -79,11 +79,10 @@ const FFVideoParam &FFEncoder::getVideoParam() const
 
 int FFEncoder::getVideoFrameSize() const
 {
-    if (!this->opened || !this->encodeVideo)
-    {
+    if (!this->opened || !this->encodeVideo) {
         return 0;
     }
-    return av_image_get_buffer_size(this->videoParam.pixelFormat, this->videoParam.width, this->videoParam.height, 0);
+    return FFUtil::getImageBufferSize(this->videoParam);
 }
 
 int FFEncoder::encodeVideoFrame(const uint8_t *data, PixelFormat format, int width, int height)
@@ -277,216 +276,182 @@ int FFEncoder::encodeAudioData(short *frameData, int dataSize)
 }
 
 
-//////////////////////////////////////////////////////////////////////////
-//
-//  Other Methods
-//
-//////////////////////////////////////////////////////////////////////////
+int FFEncoder::openAudio() {
+    if (this->encodeAudio) {
+        return -1;
+    }
+
+    if (!this->outputContext) {
+        LOGE("FFEncoder.%s, no context!", __FUNCTION__);
+        return -1;
+    }
+
+    if(this->audioParam.codecName.empty()) {
+        LOGE("FFEncoder.%s, no codec name", __FUNCTION__);
+        return -1;
+    }
+
+    // find the audio encoder
+    // use the codec name preferentially if it is specified in the input param
+    AVCodec *audioCodec = NULL;
+    audioCodec = avcodec_find_encoder_by_name(this->audioParam.codecName.c_str());
+    if (!audioCodec) {
+        LOGE("FFEncoder.%s, invalid codec!", __FUNCTION__);
+        return -1;
+    }
+
+    // add the audio stream with stream id 1
+    this->audioStream = avformat_new_stream(this->outputContext, audioCodec);
+    if (!this->audioStream) {
+        LOGE("FFEncoder.%s, failed to new stream!", __FUNCTION__);
+        return -1;
+    }
+
+    // set the parameters for audio codec context
+    AVCodecContext *audioCodecContext = this->audioStream->codec;
+    audioCodecContext->codec_id       = audioCodec->id;
+    audioCodecContext->codec_type     = CODEC_TYPE_AUDIO;
+    audioCodecContext->bit_rate       = this->audioParam.bitRate;
+    audioCodecContext->sample_rate    = this->audioParam.sampleRate;
+    audioCodecContext->channels       = this->audioParam.channels;
+
+    // open the audio codec
+    if (avcodec_open2(audioCodecContext, audioCodec, NULL) < 0) {
+        LOGE("FFEncoder.%s, failed to open codec!", __FUNCTION__);
+        return -1;
+    }
+
+    // TODO: how to determine the buffer size?
+    // allocate the output buffer
+    this->audioBufferSize = 4 * MAX_AUDIO_PACKET_SIZE;
+    this->audioBuffer     = (uint8_t*)(av_malloc(this->audioBufferSize));
+
+    return 0;
+}
+
+int FFEncoder::openVideo() {
+    if (this->encodeVideo) {
+        return -1;
+    }
+
+    if (!this->outputContext) {
+        LOGE("FFEncoder.%s, no context!", __FUNCTION__);
+        return -1;
+    }
+
+    if(this->videoParam.codecName.empty()) {
+        LOGE("FFEncoder.%s, no codec name", __FUNCTION__);
+        return -1;
+    }
+
+    // find the video encoder
+    // use the codec name preferentially if it is specified in the input param
+    AVCodec *videoCodec = NULL;
+    videoCodec = avcodec_find_encoder_by_name(this->videoParam.codecName.c_str());
+    if (!videoCodec) {
+        LOGE("FFEncoder.%s, find no codec!", __FUNCTION__);
+        return -1;
+    }
+
+    // add the video stream with stream id 0
+    this->videoStream = avformat_new_stream(this->outputContext, videoCodec);
+    if (!this->videoStream) {
+        LOGE("FFEncoder.%s, failed to new stream!", __FUNCTION__);
+        return -1;
+    }
+
+    // set the parameters for video codec context
+    AVCodecContext *videoCodecContext = this->videoStream->codec;
+    videoCodecContext->codec_id       = videoCodec->id;
+    videoCodecContext->codec_type     = CODEC_TYPE_VIDEO;
+    videoCodecContext->bit_rate       = this->videoParam.bitRate;
+    videoCodecContext->width          = this->videoParam.width;
+    videoCodecContext->height         = this->videoParam.height;
+    videoCodecContext->time_base.den  = this->videoParam.frameRate;
+    videoCodecContext->time_base.num  = 1;
+
+    // tune for video encoding
+    videoCodecContext->gop_size = 24;
+    videoCodecContext->qmin = 3;
+    videoCodecContext->qmax = 33;
+    videoCodecContext->max_qdiff = 4;
+    videoCodecContext->qcompress = 0.6f;
+
+    videoCodecContext->me_range = 64;		
+    //videoCodecContext->me_method = ME_FULL;
+    videoCodecContext->me_range = 64;
+    //videoCodecContext->partitions = X264_PART_I4X4 | X264_PART_I8X8 | X264_PART_P8X8 | X264_PART_P4X4 | X264_PART_B8X8;
+    //videoCodecContext->coder_type = FF_CODER_TYPE_AC;
+    videoCodecContext->max_b_frames = 1;
+
+    // set the PixelFormat of the target encoded video
+    if (videoCodec->pix_fmts) {
+        // try to find the PixelFormat required by the input param,
+        // use the default PixelFormat directly if required format not found
+        const enum PixelFormat *p= videoCodec->pix_fmts;
+        for ( ; *p != PIX_FMT_NONE; p ++) {
+            if (*p == this->videoParam.pixelFormat)
+                break;
+        }
+        if (*p == PIX_FMT_NONE)
+            videoCodecContext->pix_fmt = videoCodec->pix_fmts[0];
+        else
+            videoCodecContext->pix_fmt = *p;
+    }
+
+    // open the video codec
+    if (avcodec_open2(videoCodecContext, videoCodec, NULL) < 0) {
+        LOGE("FFEncoder.%s, find but failed to open codec!", __FUNCTION__);
+        return -1;
+    }
+
+    // allocate the output buffer
+    // the maximum possible buffer size could be the raw bmp format with R/G/B/A
+    this->videoBufferSize = 4 * this->videoParam.width * this->videoParam.height;
+    this->videoBuffer     = (uint8_t*)(av_malloc(this->videoBufferSize));
+
+    // allocate the temporal video frame buffer for pixel format conversion if needed
+    // FIXME: always allocate it when format or size is different
+    if (this->videoParam.pixelFormat != videoCodecContext->pix_fmt) {
+        this->videoFrame = (AVPicture *)av_malloc(sizeof(AVPicture));
+#if 0
+        if (   this->videoFrame == NULL
+                || avpicture_alloc(this->videoFrame, videoCodecContext->pix_fmt, videoCodecContext->width, videoCodecContext->height) < 0 )
+        {
+            LOGE("FFEncoder.open, failed to alloc video frame!");
+            return -1;
+        }
+#endif
+    }
+
+    return 0;
+}
 
 int FFEncoder::open()
 {
     LOGI("FFEncoder.open, begin!");
-    if (this->opened)
-    {
-        LOGW("FFEncoder.open, try to reopen!");
-        return -1;
-    }
-
-    if (this->videoParam.codecName.empty() && 
-            this->audioParam.codecName.empty())
-    {
-        LOGE("FFEncoder.open, no output or codec name");
+    if (this->opened) {
+        LOGW("FFEncoder.%s, opened!", __FUNCTION__);
         return -1;
     }
 
     // allocate the output media context
     this->outputContext = avformat_alloc_context();
-    if (!this->outputContext)
-    {
-        LOGE("FFEncoder.open, failed to alloc context!");
+    if (!this->outputContext) {
+        LOGE("FFEncoder.%s, failed to alloc context!", __FUNCTION__);
         return -1;
     }
 
-    // video related initialization if necessary
-    if (this->encodeVideo)
-    {
-        // validate the video codec
-        if (this->videoParam.codecName.empty())
-        {
-            LOGE("FFEncoder.open, no video codec name!");
-            return -1;
-        }
-
-        // find the video encoder
-        AVCodec *videoCodec = NULL;
-
-        // use the codec name preferentially if it is specified in the input param
-        videoCodec = avcodec_find_encoder_by_name(this->videoParam.codecName.c_str());
-
-        if (!videoCodec)
-        {
-            LOGE("FFEncoder.open, find no video codec!");
-            return -1;
-        }
-
-        // add the video stream with stream id 0
-        this->videoStream = av_new_stream(this->outputContext, videoCodec);
-        if (!this->videoStream)
-        {
-            LOGE("FFEncoder.open, failed to new video stream!");
-            return -1;
-        }
-
-        // set the parameters for video codec context
-        AVCodecContext *videoCodecContext = this->videoStream->codec;
-        videoCodecContext->codec_id       = videoCodec->id;
-        videoCodecContext->codec_type     = CODEC_TYPE_VIDEO;
-        videoCodecContext->bit_rate       = this->videoParam.bitRate;
-        videoCodecContext->width          = this->videoParam.width;
-        videoCodecContext->height         = this->videoParam.height;
-        videoCodecContext->time_base.den  = this->videoParam.frameRate;
-        videoCodecContext->time_base.num  = 1;
-
-        // tune for video encoding
-        videoCodecContext->gop_size = 24;
-        videoCodecContext->qmin = 3;
-        videoCodecContext->qmax = 33;
-        videoCodecContext->max_qdiff = 4;
-        videoCodecContext->qcompress = 0.6f;
-
-        videoCodecContext->me_range = 64;		
-        //videoCodecContext->me_method = ME_FULL;
-        videoCodecContext->me_range = 64;
-        //videoCodecContext->partitions = X264_PART_I4X4 | X264_PART_I8X8 | X264_PART_P8X8 | X264_PART_P4X4 | X264_PART_B8X8;
-        //videoCodecContext->coder_type = FF_CODER_TYPE_AC;
-        videoCodecContext->max_b_frames = 1;
-
-        // set the PixelFormat of the target encoded video
-        if (videoCodec->pix_fmts)
-        {
-            // try to find the PixelFormat required by the input param,
-            // use the default PixelFormat directly if required format not found
-            const enum PixelFormat *p= videoCodec->pix_fmts;
-            for ( ; *p != PIX_FMT_NONE; p ++)
-            {
-                if (*p == this->videoParam.pixelFormat)
-                    break;
-            }
-            if (*p == PIX_FMT_NONE)
-                videoCodecContext->pix_fmt = videoCodec->pix_fmts[0];
-            else
-                videoCodecContext->pix_fmt = *p;
-        }
-
-        // open the video codec
-        if (avcodec_open(videoCodecContext, videoCodec, NULL) < 0)
-        {
-            LOGE("FFEncoder.open, find but failed to open video codec!");
-            return -1;
-        }
-
-        // allocate the output buffer
-        // the maximum possible buffer size could be the raw bmp format with R/G/B/A
-        this->videoBufferSize = 4 * this->videoParam.width * this->videoParam.height;
-        this->videoBuffer     = (uint8_t*)(av_malloc(this->videoBufferSize));
-
-        // allocate the temporal video frame buffer for pixel format conversion if needed
-        // FIXME: always allocate it when format or size is different
-        if (this->videoParam.pixelFormat != videoCodecContext->pix_fmt)
-        {
-            this->videoFrame = (AVPicture *)av_malloc(sizeof(AVPicture));
-#if 0
-            if (   this->videoFrame == NULL
-                    || avpicture_alloc(this->videoFrame, videoCodecContext->pix_fmt, videoCodecContext->width, videoCodecContext->height) < 0 )
-            {
-                LOGE("FFEncoder.open, failed to alloc video frame!");
-                return -1;
-            }
-#endif
-        }
-    }
-
-    // audio related initialization if necessary
-    if (this->encodeAudio)
-    {
-        // validate the audio codec
-        if (this->audioParam.codecName.empty())
-        {
-            LOGE("FFEncoder.open, no outputformat or no audio codec name!");
-            return -1;
-        }
-
-        // find the audio encoder
-        AVCodec *audioCodec = NULL;
-
-        // use the codec name preferentially if it is specified in the input param
-        audioCodec = avcodec_find_encoder_by_name(this->audioParam.codecName.c_str());
-
-        if (!audioCodec)
-        {
-            LOGE("FFEncoder.open, invalid audio codec!");
-            return -1;
-        }
-
-        // add the audio stream with stream id 1
-        this->audioStream = av_new_stream(this->outputContext, audioCodec);
-        if (!this->audioStream)
-        {
-            LOGE("FFEncoder.open, failed to new audio stream!");
-            return -1;
-        }
-
-        // set the parameters for audio codec context
-        AVCodecContext *audioCodecContext = this->audioStream->codec;
-        audioCodecContext->codec_id       = audioCodec->id;
-        audioCodecContext->codec_type     = CODEC_TYPE_AUDIO;
-        audioCodecContext->bit_rate       = this->audioParam.bitRate;
-        audioCodecContext->sample_rate    = this->audioParam.sampleRate;
-        audioCodecContext->channels       = this->audioParam.channels;
-
-        // open the audio codec
-        if (avcodec_open(audioCodecContext, audioCodec, NULL) < 0)
-        {
-            LOGE("FFEncoder.open, failed to open audio codec!");
-            return -1;
-        }
-
-        // TODO: how to determine the buffer size?
-        // allocate the output buffer
-        this->audioBufferSize = 4 * MAX_AUDIO_PACKET_SIZE;
-        this->audioBuffer     = (uint8_t*)(av_malloc(this->audioBufferSize));
-    }
-
+    openVideo();
+    openAudio();
     this->opened = true;
-    LOGI("FFEncoder.open, end!");
+    LOGI("FFEncoder.%s, end!", __FUNCTION__);
 
     return 0;
 }
 
-void FFEncoder::close()
-{
-    if (!this->opened)
-    {
-        return;
-    }
-
-    if (this->encodeVideo)
-    {
-        // close the video stream and codec
-        avcodec_close(this->videoStream->codec);
-        av_freep(&this->videoStream->codec);
-        av_freep(&this->videoStream);
-        av_freep(&this->videoBuffer);
-        this->videoBufferSize = 0;
-        if (this->videoFrame != NULL)
-        {
-            //avpicture_free(this->videoFrame);
-            av_freep(&this->videoFrame);
-        }
-    }
-
-    if (this->encodeAudio)
-    {
+void FFEncoder::closeAudio() {
+    if (this->encodeAudio) {
         // close the audio stream and codec
         avcodec_close(this->audioStream->codec);
         av_freep(&this->audioStream->codec);
@@ -494,7 +459,31 @@ void FFEncoder::close()
         av_freep(&this->audioBuffer);
         this->audioBufferSize = 0;
     }
+}
 
+void FFEncoder::closeVideo() {
+    if (this->encodeVideo) {
+        // close the video stream and codec
+        avcodec_close(this->videoStream->codec);
+        av_freep(&this->videoStream->codec);
+        av_freep(&this->videoStream);
+        av_freep(&this->videoBuffer);
+        this->videoBufferSize = 0;
+        if (this->videoFrame != NULL) {
+            //avpicture_free(this->videoFrame);
+            av_freep(&this->videoFrame);
+        }
+    }
+}
+
+void FFEncoder::close()
+{
+    if (!this->opened) {
+        return;
+    }
+
+    closeAudio();
+    closeVideo();
     av_freep(&this->outputContext);
 
     this->opened = false;

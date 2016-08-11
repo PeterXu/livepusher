@@ -97,6 +97,8 @@ public:
     /// @param  [in/opt] fileName  The name of the file to which encoded results are written.
     ///
     int open();
+    int openAudio();
+    int openVideo();
 
     ///
     /// @brief  Close the codec, output file and release the memories
@@ -104,6 +106,8 @@ public:
     /// Must be called after encoding process is finished.
     ///
     void close();
+    void closeAudio();
+    void closeVideo();
 
     ///
     /// @brief  Encode one video frame (just encode, won't write encoded data to output file).
