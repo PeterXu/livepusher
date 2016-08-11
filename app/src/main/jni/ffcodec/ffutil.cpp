@@ -20,7 +20,7 @@ int FFUtil::convertPixFmt(AVFrame *srcFrame, AVFrame *dstFrame,
     return (dstHeight == dstParam.height) ? 0 : -1;
 }
 
-AVFrame *FFUtil::allocAVFrameWithBuffer(PixelFormat fmt, int width, int height) {
+AVFrame *FFUtil::allocAVFrameWithBuffer(AVPixelFormat fmt, int width, int height) {
     AVFrame *frame = av_frame_alloc();
     frame->format = fmt;
     frame->height = width;
@@ -32,9 +32,25 @@ AVFrame *FFUtil::allocAVFrameWithBuffer(PixelFormat fmt, int width, int height) 
     }
     return frame;
 }
+AVFrame *FFUtil::allocAVFrameWithBuffer(AVSampleFormat fmt, int nb_samples, int channels, int channel_layout) {
+    AVFrame *frame = av_frame_alloc();
+    frame->format = fmt;
+    frame->nb_samples = nb_samples;
+    frame->channels = channels;
+    frame->channel_layout = channel_layout;
+    int ret = av_frame_get_buffer(frame, 0);
+    if (ret < 0) {
+        av_frame_free(&frame);
+        frame = NULL;
+    }
+    return frame;
+}
 
 AVFrame *FFUtil::allocAVFrameWithBuffer(const FFVideoParam &param) {
     return allocAVFrameWithBuffer(param.pixelFormat, param.width, param.height);
+}
+AVFrame *FFUtil::allocAVFrameWithBuffer(const FFAudioParam &param) {
+    return allocAVFrameWithBuffer(param.sampleFormat, 1, param.channels, 0);
 }
 
 int FFUtil::fillAVFrameData(AVFrame *frame, const uint8_t *src, int srcLen, const FFVideoParam &param) {

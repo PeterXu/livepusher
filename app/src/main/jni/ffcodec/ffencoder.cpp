@@ -49,6 +49,11 @@ FFEncoder::~FFEncoder()
     this->close();
 }
 
+
+// =====================
+// For Video Encoder
+// =====================
+
 const uint8_t *FFEncoder::getVideoEncodedBuffer() const
 {
     return this->videoBuffer;
@@ -85,17 +90,22 @@ int FFEncoder::encodeVideoFrame(const uint8_t *data, PixelFormat format, int wid
     FFVideoParam inParam(width, height, format, 0, 0, "");
     AVFrame *frame = FFUtil::allocAVFrameWithBuffer(inParam);
     if (!frame) {
+        LOGE("FFEncoder.%s, fail to alloc AVFrame", __FUNCTION__);
         return -1;
     }
 
-    int ret = FFUtil::fillAVFrameData(frame, data, 0, inParam);
-    if(ret <= 0) {
-        av_frame_free(&frame);
-        return -1;
-    }
+    int ret = -1;
+    do {
+        ret = FFUtil::fillAVFrameData(frame, data, 0, inParam);
+        if(ret <= 0) {
+            LOGE("FFEncoder.%s, fail to fill AVFrame", __FUNCTION__);
+            break;
+        }
 
-    frame->pts = AV_NOPTS_VALUE;
-    ret = this->encodeVideoData(frame, inParam);
+        frame->pts = AV_NOPTS_VALUE;
+        ret = this->encodeVideoData(frame, inParam);
+    }while(0);
+
     av_frame_free(&frame);
     return ret;
 }
@@ -107,23 +117,36 @@ int FFEncoder::encodeVideoData(const AVFrame *frame, const FFVideoParam &param)
     // convert the pixel format if needed
     if (param.pixelFormat != avctx->pix_fmt ||
         param.width != avctx->width || param.height != avctx->height) {
-        LOGE("FFEncoder::encodeVideoData, VideoParam match error");
+        LOGE("FFEncoder.%s, VideoParam match error", __FUNCTION__);
         return -1;
     }
 
     AVPacket *avpkt = av_packet_alloc();
-    av_init_packet(avpkt);
-
-    int got_pkt = 0;
-    int encodedSize = avcodec_encode_video2(avctx, avpkt, frame, &got_pkt);
-    if (encodedSize < 0) {
+    if (!avpkt) {
+        LOGE("FFEncoder.%s, fail to av_packet_alloc", __FUNCTION__);
         return -1;
     }
+    av_init_packet(avpkt);
+
+    int encodedSize = -1;
+    do {
+        int got_pkt = 0;
+        encodedSize = avcodec_encode_video2(avctx, avpkt, frame, &got_pkt);
+        if (encodedSize < 0) {
+            LOGE("FFEncoder.%s, encode error", __FUNCTION__);
+            break;
+        }
+    }while(0);
 
     av_packet_unref(avpkt);
 
     return encodedSize;
 }
+
+
+//=====================
+// For Audio Encoder
+//=====================
 
 const uint8_t *FFEncoder::getAudioEncodedBuffer() const
 {
@@ -147,33 +170,16 @@ const FFAudioParam &FFEncoder::getAudioParam() const
 
 int FFEncoder::getAudioFrameSize() const
 {
-    if (!this->opened || !this->encodeAudio)
-    {
+    if (!this->opened || !this->encodeAudio) {
         return 0;
     }
 
     int frameSize = 0;
-    if (this->audioStream->codec && this->audioStream->codec->frame_size > 1)
-    {
+    if (this->audioStream->codec && this->audioStream->codec->frame_size > 1) {
         frameSize  = this->audioStream->codec->frame_size;
         frameSize *= this->audioStream->codec->channels;    // multiply the channels
         frameSize *= sizeof(short); // convert to bytes
-    }
-    else
-    {
-        // hack for PCM audio codec
-        //frameSize = this->audioBufferSize / this->audioParam.channels;
-        //switch (this->audioStream->codec->codec_id)
-        //{
-        //    case CODEC_ID_PCM_S16LE:
-        //    case CODEC_ID_PCM_S16BE:
-        //    case CODEC_ID_PCM_U16LE:
-        //    case CODEC_ID_PCM_U16BE:
-        //        frameSize >>= 1;
-        //        break;
-        //    default:
-        //        break;
-        //}
+    } else {
         frameSize = this->audioBufferSize;  // including all channels, return bytes directly
     }
     return frameSize;
@@ -181,18 +187,12 @@ int FFEncoder::getAudioFrameSize() const
 
 int FFEncoder::encodeAudioFrame(const uint8_t *frameData, int dataSize)
 {
-    if (!this->opened)
-    {
+    if (!this->opened || !this->encodeAudio) {
         return -1;
     }
 
-    if (!this->encodeAudio)
-    {
-        return -1;
-    }
-
-    if (this->audioStream->codec->frame_size <= 1 && dataSize < 1)
-    {
+    if (this->audioStream->codec->frame_size <= 1 && dataSize < 1) {
+        LOGE("FFEncoder.%s, invalid frame_size or dataSize", __FUNCTION__);
         return -1;
     }
 
@@ -205,67 +205,41 @@ int FFEncoder::encodeAudioData(short *frameData, int dataSize)
     // the output size of the buffer which stores the encoded data
     int audioSize = this->audioBufferSize;
 
-    if (this->audioStream->codec->frame_size <=1 && dataSize > 0)
-    {
+    if (this->audioStream->codec->frame_size <=1 && dataSize > 0) {
         // For PCM related codecs, the output size of the encoded data is
         // calculated from the size of the input audio frame.
         audioSize = dataSize;
-
-        // The following codes are used for calculating "short" size from original "sample" size.
-        // The codes are not needed any more because now the input size is already in "short" unit.
-
-        // calculated the PCM size from input data size
-        //switch(this->audioStream->codec->codec_id)
-        //{
-        //    case CODEC_ID_PCM_S32LE:
-        //    case CODEC_ID_PCM_S32BE:
-        //    case CODEC_ID_PCM_U32LE:
-        //    case CODEC_ID_PCM_U32BE:
-        //        audioSize <<= 1;
-        //        break;
-        //    case CODEC_ID_PCM_S24LE:
-        //    case CODEC_ID_PCM_S24BE:
-        //    case CODEC_ID_PCM_U24LE:
-        //    case CODEC_ID_PCM_U24BE:
-        //    case CODEC_ID_PCM_S24DAUD:
-        //        audioSize = audioSize / 2 * 3;
-        //        break;
-        //    case CODEC_ID_PCM_S16LE:
-        //    case CODEC_ID_PCM_S16BE:
-        //    case CODEC_ID_PCM_U16LE:
-        //    case CODEC_ID_PCM_U16BE:
-        //        break;
-        //    default:
-        //        audioSize >>= 1;
-        //        break;
-        //}
     }
 
     // encode the frame
-    AVCodecContext *audioCodecContext = this->audioStream->codec;
+    AVCodecContext *avctx = this->audioStream->codec;
 
-    AVPacket pkt;
-    av_init_packet(&pkt);
-    pkt.data = NULL;
-    pkt.size = 0;
-    
-
-#if 0
-    int got_packet = 0;
-    int encodedSize = avcodec_encode_audio(audioCodecContext, &pkt, frameData, &got_packet);
-
-    if (encodedSize < 0)
-    {
+    AVPacket *avpkt = av_packet_alloc();
+    if (!avpkt) {
+        LOGE("FFEncoder.%s, fail to av_packet_alloc", __FUNCTION__);
         return -1;
     }
-    else
-    {
-        return encodedSize;
-    }
-#endif
-    return 0;
+    av_init_packet(avpkt);
+
+    int encodedSize = -1;
+    do {
+        int got_packet = 0;
+        //encodedSize = avcodec_encode_audio2(avctx, avpkt, frameData, &got_packet);
+        if (encodedSize < 0) {
+            LOGE("FFEncoder.%s, encode error", __FUNCTION__);
+            break;
+        }
+    }while(0);
+
+    av_packet_unref(avpkt);
+
+    return encodedSize;
 }
 
+
+// ============================
+// Open Encoder (Audio & Video)
+// ============================
 
 int FFEncoder::openAudio() {
     if (!this->encodeAudio) {
@@ -439,6 +413,11 @@ int FFEncoder::open()
 
     return 0;
 }
+
+
+// ============================
+// Open Encoder (Audio & Video)
+// ============================
 
 void FFEncoder::closeAudio() {
     if (this->encodeAudio) {

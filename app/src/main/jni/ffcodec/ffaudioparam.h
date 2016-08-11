@@ -6,7 +6,8 @@
 class FF_EXPORT FFAudioParam
 {
 public:
-    FFAudioParam() : sampleRate(0), channels(0), bitRate(0), codecName("") {
+    FFAudioParam() : 
+        sampleFormat(AV_SAMPLE_FMT_NONE), sampleRate(0), channels(0), bitRate(0), codecName("") {
     }
 
     FFAudioParam(int sampleRate, int channels, int bitRate, std::string codecName) : 
@@ -14,10 +15,12 @@ public:
     }
 
     bool isValid() {
-        return !(bitRate < 1024 || sampleRate < 1024 || channels < 1 || codecName.empty());
+        return !(sampleFormat == AV_SAMPLE_FMT_NONE || sampleRate < 1024 || channels < 1 ||
+                bitRate < 1024 || codecName.empty());
     }
 
 public:
+    AVSampleFormat sampleFormat;
     int sampleRate;             ///< The sample rate of the audio
     int channels;               ///< The number of audio channels
     int bitRate;                ///< The bit rate of the audio

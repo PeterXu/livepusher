@@ -3,6 +3,7 @@
 
 #include "ffheader.h"
 #include "ffvideoparam.h"
+#include "ffaudioparam.h"
 
 class FF_EXPORT FFUtil {
 public:
@@ -22,8 +23,10 @@ public:
     static int convertPixFmt(const uint8_t *src, int srclen, int srcw, int srch, PixelFormat srcfmt, 
             uint8_t *dst, int dstlen, int dstw, int dsth, PixelFormat dstfmt);
 
-    static AVFrame *allocAVFrameWithBuffer(PixelFormat fmt, int width, int height);
+    static AVFrame *allocAVFrameWithBuffer(AVPixelFormat fmt, int width, int height);
+    static AVFrame *allocAVFrameWithBuffer(AVSampleFormat fmt, int nb_samples, int channels, int channel_layout);
     static AVFrame *allocAVFrameWithBuffer(const FFVideoParam &param);
+    static AVFrame *allocAVFrameWithBuffer(const FFAudioParam &param);
 
     static int fillAVFrameData(AVFrame *frame, const uint8_t *src, int srcLen, const FFVideoParam &param);
     static int copyAVFrameData(const AVFrame *frame, uint8_t *dst, int dstLen, const FFVideoParam &param);
