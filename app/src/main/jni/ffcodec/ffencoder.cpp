@@ -2,8 +2,6 @@
 #include "ffutil.h"
 #include "logtrace.h"
 
-// define the max audio packet size as 128 KB
-#define MAX_AUDIO_PACKET_SIZE (128 * 1024)
 
 
 FFEncoder::FFEncoder(const FFVideoParam &vp, const FFAudioParam &ap) : 
@@ -50,13 +48,6 @@ FFEncoder::~FFEncoder()
 {
     this->close();
 }
-
-
-//////////////////////////////////////////////////////////////////////////
-//
-//  Methods For Video
-//
-//////////////////////////////////////////////////////////////////////////
 
 const uint8_t *FFEncoder::getVideoEncodedBuffer() const
 {
@@ -277,7 +268,8 @@ int FFEncoder::encodeAudioData(short *frameData, int dataSize)
 
 
 int FFEncoder::openAudio() {
-    if (this->encodeAudio) {
+    if (!this->encodeAudio) {
+        LOGE("FFEncoder.%s, disable!", __FUNCTION__);
         return -1;
     }
 
@@ -310,7 +302,7 @@ int FFEncoder::openAudio() {
     // set the parameters for audio codec context
     AVCodecContext *audioCodecContext = this->audioStream->codec;
     audioCodecContext->codec_id       = audioCodec->id;
-    audioCodecContext->codec_type     = CODEC_TYPE_AUDIO;
+    audioCodecContext->codec_type     = AVMEDIA_TYPE_AUDIO;
     audioCodecContext->bit_rate       = this->audioParam.bitRate;
     audioCodecContext->sample_rate    = this->audioParam.sampleRate;
     audioCodecContext->channels       = this->audioParam.channels;
@@ -330,7 +322,8 @@ int FFEncoder::openAudio() {
 }
 
 int FFEncoder::openVideo() {
-    if (this->encodeVideo) {
+    if (!this->encodeVideo) {
+        LOGE("FFEncoder.%s, disable!", __FUNCTION__);
         return -1;
     }
 
@@ -363,7 +356,7 @@ int FFEncoder::openVideo() {
     // set the parameters for video codec context
     AVCodecContext *videoCodecContext = this->videoStream->codec;
     videoCodecContext->codec_id       = videoCodec->id;
-    videoCodecContext->codec_type     = CODEC_TYPE_VIDEO;
+    videoCodecContext->codec_type     = AVMEDIA_TYPE_VIDEO;
     videoCodecContext->bit_rate       = this->videoParam.bitRate;
     videoCodecContext->width          = this->videoParam.width;
     videoCodecContext->height         = this->videoParam.height;
@@ -413,15 +406,11 @@ int FFEncoder::openVideo() {
     // allocate the temporal video frame buffer for pixel format conversion if needed
     // FIXME: always allocate it when format or size is different
     if (this->videoParam.pixelFormat != videoCodecContext->pix_fmt) {
-        this->videoFrame = (AVPicture *)av_malloc(sizeof(AVPicture));
-#if 0
-        if (   this->videoFrame == NULL
-                || avpicture_alloc(this->videoFrame, videoCodecContext->pix_fmt, videoCodecContext->width, videoCodecContext->height) < 0 )
-        {
-            LOGE("FFEncoder.open, failed to alloc video frame!");
+        this->videoFrame = FFUtil::allocAVFrameWithBuffer(this->videoParam);
+        if (this->videoFrame == NULL) {
+            LOGE("FFEncoder.%s, failed to alloc video frame!", __FUNCTION__);
             return -1;
         }
-#endif
     }
 
     return 0;
@@ -444,6 +433,7 @@ int FFEncoder::open()
 
     openVideo();
     openAudio();
+
     this->opened = true;
     LOGI("FFEncoder.%s, end!", __FUNCTION__);
 
@@ -484,6 +474,7 @@ void FFEncoder::close()
 
     closeAudio();
     closeVideo();
+
     av_freep(&this->outputContext);
 
     this->opened = false;

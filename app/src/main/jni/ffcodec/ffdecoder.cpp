@@ -141,7 +141,7 @@ int FFDecoder::open()
         }
 
         // add the video stream with stream id 0
-        this->videoStream = av_new_stream(this->inputContext, 0);
+        this->videoStream = avformat_new_stream(this->inputContext, 0);
         if (!this->videoStream)
         {
             LOGE("FFDecoder.open, failed to new video stream!");
@@ -151,7 +151,7 @@ int FFDecoder::open()
         // get the video parameters
         AVCodecContext *videoCodecContext = this->videoStream->codec;
         videoCodecContext->codec_id     = videoCodec->id;
-        videoCodecContext->codec_type   = CODEC_TYPE_VIDEO;
+        videoCodecContext->codec_type   = AVMEDIA_TYPE_VIDEO;
         videoCodecContext->width        = this->videoParam.width;
         videoCodecContext->height       = this->videoParam.height;
         videoCodecContext->pix_fmt      = this->videoParam.pixelFormat;
@@ -161,7 +161,7 @@ int FFDecoder::open()
 
 
         // open the video codec
-        if (avcodec_open(videoCodecContext, videoCodec, NULL))
+        if (avcodec_open2(videoCodecContext, videoCodec, NULL))
         {
             LOGE("FFDecoder.open, find but failed to open video codec!");
             return -1;
@@ -183,7 +183,7 @@ int FFDecoder::open()
         audioCodec = avcodec_find_decoder_by_name(this->audioParam.codecName.c_str());
 
         // add the audio stream with stream id 1
-        this->audioStream = av_new_stream(this->inputContext, audioCodec);
+        this->audioStream = avformat_new_stream(this->inputContext, audioCodec);
         if (!this->videoStream)
         {
             return -1;
@@ -197,7 +197,7 @@ int FFDecoder::open()
         // get the audio parameters
         AVCodecContext *audioCodecContext = this->audioStream->codec;
         audioCodecContext->codec_id     = audioCodec->id;
-        audioCodecContext->codec_type   = CODEC_TYPE_AUDIO;
+        audioCodecContext->codec_type   = AVMEDIA_TYPE_AUDIO;
         audioCodecContext->sample_rate  = this->audioParam.sampleRate;
         audioCodecContext->channels     = this->audioParam.channels;
         audioCodecContext->bit_rate     = this->audioParam.bitRate;

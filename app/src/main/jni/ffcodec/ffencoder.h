@@ -136,31 +136,6 @@ public:
     int encodeAudioFrame(const uint8_t *frameData, int dataSize = 0);
 
 private:
-    //////////////////////////////////////////////////////////////////////////
-    //
-    //  Private Definitions
-    //
-    //////////////////////////////////////////////////////////////////////////
-
-    bool encodeVideo;   ///< Whether video encoding is needed
-    bool encodeAudio;   ///< Whether audio encoding is needed
-    bool opened;        ///< Whether the FFEncoder is opened yet
-
-    FFVideoParam videoParam;    ///< The video parameters of the video to be encoded
-    FFAudioParam audioParam;    ///< The audio parameters of the audio to be encoded
-
-    AVFormatContext *outputContext; ///< The output format context
-    AVStream *videoStream;          ///< The video output stream
-    AVStream *audioStream;          ///< The audio output stream
-
-    AVPicture *videoFrame;          ///< The temporary video frame for pixel format conversion
-    uint8_t *videoBuffer;       ///< The video output buffer
-    int     videoBufferSize;    ///< The size of video output buffer
-
-    uint8_t *audioBuffer;       ///< The audio output buffer
-    int     audioBufferSize;    ///< The size of audio output buffer
-
-private:
     // init parameters for encode
     void init();
 
@@ -183,6 +158,25 @@ private:
     /// @return A non-negative int represents the size of the encoded data
     ///
     int encodeAudioData(short *frameData, int dataSize);
+
+private:
+    bool encodeVideo;   ///< Whether video encoding is needed
+    bool encodeAudio;   ///< Whether audio encoding is needed
+    bool opened;        ///< Whether the FFEncoder is opened yet
+
+    FFVideoParam videoParam;    ///< The video parameters of the video to be encoded
+    FFAudioParam audioParam;    ///< The audio parameters of the audio to be encoded
+
+    AVFormatContext *outputContext; ///< The output format context
+    AVStream *videoStream;          ///< The video output stream
+    AVStream *audioStream;          ///< The audio output stream
+
+    AVFrame *videoFrame;            ///< The temporary video frame for pixel format conversion
+    uint8_t *videoBuffer;           ///< The video output buffer
+    int     videoBufferSize;        ///< The size of video output buffer
+
+    uint8_t *audioBuffer;       ///< The audio output buffer
+    int     audioBufferSize;    ///< The size of audio output buffer
 };
 
 #endif
