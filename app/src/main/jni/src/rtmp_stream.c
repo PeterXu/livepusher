@@ -1,5 +1,6 @@
 #include "common.h"
 
+
 //> static variables
 static jni_t 	s_jni;
 static pusher_t s_pusher;
@@ -87,7 +88,7 @@ int initJavaPusherNative(JNIEnv *env) {
 
     jclass clazz = (*env)->GetObjectClass(env, s_jni.pusher_obj);
     if (!clazz) {
-        LOGE("fail to get class from pusher_obj");
+        LOGE("[%s] fail to get class from pusher_obj", __FUNCTION__);
         return -1;
     }
 
@@ -109,7 +110,7 @@ void* publiser(void *args) {
 
         LOGI("start to RTMP_Init");
         RTMP_Init(s_pusher.proto.rtmp);
-        s_pusher.proto.rtmp->Link.timeout = 5;
+        s_pusher.proto.rtmp->Link.timeout = 7;
 
         LOGI("RTMP_SetupURL RTMP is: 0x%p, path: %s", s_pusher.proto.rtmp, s_pusher.proto.rtmp_path);
         if (!RTMP_SetupURL(s_pusher.proto.rtmp, s_pusher.proto.rtmp_path)) {
@@ -192,6 +193,7 @@ END:
     notifyNativeInfo(LOG_STATE, E_STOP);
 
     (*s_jni.jvm)->DetachCurrentThread(s_jni.jvm);
+
     pthread_exit(0);
 }
 

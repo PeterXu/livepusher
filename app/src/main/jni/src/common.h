@@ -2,24 +2,26 @@
 #define __COMMON_H_
 
 #include <jni.h>
-#include <android/log.h>
 #include <stdio.h>
-#include <queue.h>
 #include <pthread.h>
-#include <cpu-features.h>
+#include "queue.h"
 
+
+//> use x264
 #define HAVE_X264
 
 #include "librtmp/rtmp.h"
 #include "librtmp/log.h"
-
 #include "faac.h"
-
 #ifdef HAVE_X264
 #include "x264.h"
 #include "common/common.h"
 #endif
 
+
+//> android log
+#include <android/log.h>
+#include <cpu-features.h>
 #define DEBUG
 #ifdef DEBUG
 #define LOGD(...) __android_log_print(ANDROID_LOG_DEBUG, "NDK", __VA_ARGS__)
@@ -30,6 +32,8 @@
 #define LOGW(...) __android_log_print(ANDROID_LOG_WARN,  "NDK", __VA_ARGS__)
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, "NDK", __VA_ARGS__)
 
+
+//> status code
 enum {
     E_START     = 100,
     E_STOP      = 101,
@@ -44,6 +48,7 @@ enum {
     E_RTMP_SEND         = -108,
 };
 
+//> notify mark
 enum {
     LOG_ERROR,
     LOG_STATE,
@@ -54,6 +59,8 @@ enum {
 typedef unsigned long ULONG;
 #endif
 
+
+//> jni struct
 typedef struct jni_t {
     JavaVM *jvm;
     jobject pusher_obj;
@@ -61,14 +68,15 @@ typedef struct jni_t {
     jmethodID stateId;
 }jni_t;
 
-// audio
+
+//> audio
 typedef struct audio_enc_t {
     faacEncHandle handle;
     ULONG nMaxOutputBytes;
     ULONG nInputSamples;
 }audio_enc_t;
 
-// video
+//> video
 typedef struct video_enc_t {
     x264_t *handle;
     x264_picture_t *pic_in;
@@ -82,7 +90,8 @@ typedef struct video_enc_t {
     int fps;
 }video_enc_t;
 
-// rtmp
+
+//> rtmp proto
 #define _RTMP_Free(_rtmp)  if(_rtmp) {RTMP_Free(_rtmp); _rtmp = NULL;}
 #define _RTMP_Close(_rtmp)  if(_rtmp && RTMP_IsConnected(_rtmp)) RTMP_Close(_rtmp);
 
@@ -92,6 +101,7 @@ typedef struct proto_net_t {
 }proto_net_t;
 
 
+//> main entry struct
 typedef struct pusher_t {
     int status;
     int publishing;
@@ -105,20 +115,19 @@ typedef struct pusher_t {
 }pusher_t;
 
 
-//> video
+//> video methods
 void fireVideo(video_enc_t *video, uint8_t *nv21_buffer);
 void releaseVideo(video_enc_t *video);
 int setVideoOptions(video_enc_t *video, int width, int height, int bitrate, int fps);
 
-//> audio
+//> audio methods
 void fireAudio(audio_enc_t *audio, uint8_t* data, int len);
 void releaseAudio(audio_enc_t *audio);
 int setAudioOptions(audio_enc_t *audio, int sampleRate, int channel, int bitrate);
 
-//> rtmp
+//> rtmp methods
 void add_aac_sequence_header(faacEncHandle handle);
 void add_aac_body(unsigned char * buf, int len);
-
 void add_264_sequence_header(unsigned char* pps, unsigned char* sps, int pps_len, int sps_len);
 void add_264_body(unsigned char * buf, int len);
 
@@ -126,4 +135,5 @@ void add_264_body(unsigned char * buf, int len);
 //> misc
 void notifyNativeInfo(int level, int code);
 
-#endif
+
+#endif // __COMMON_H_
