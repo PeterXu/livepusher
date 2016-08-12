@@ -9,6 +9,8 @@ ifeq ($(TARGET_ARCH_ABI), armeabi-v7a)
 endif
 
 LOCAL_SRC_FILES :=  \
+	audio_stream.c	\
+	video_stream.c	\
 	rtmp_stream.c	\
 	queue.c
 	

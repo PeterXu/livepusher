@@ -44,6 +44,11 @@ enum {
     E_RTMP_SEND         = -108,
 };
 
+enum {
+    LOG_ERROR,
+    LOG_STATE,
+};
+
 
 #ifndef ULONG
 typedef unsigned long ULONG;
@@ -99,5 +104,26 @@ typedef struct pusher_t {
     proto_net_t proto;
 }pusher_t;
 
+
+//> video
+void fireVideo(video_enc_t *video, uint8_t *nv21_buffer);
+void releaseVideo(video_enc_t *video);
+int setVideoOptions(video_enc_t *video, int width, int height, int bitrate, int fps);
+
+//> audio
+void fireAudio(audio_enc_t *audio, uint8_t* data, int len);
+void releaseAudio(audio_enc_t *audio);
+int setAudioOptions(audio_enc_t *audio, int sampleRate, int channel, int bitrate);
+
+//> rtmp
+void add_aac_sequence_header(faacEncHandle handle);
+void add_aac_body(unsigned char * buf, int len);
+
+void add_264_sequence_header(unsigned char* pps, unsigned char* sps, int pps_len, int sps_len);
+void add_264_body(unsigned char * buf, int len);
+
+
+//> misc
+void notifyNativeInfo(int level, int code);
 
 #endif
