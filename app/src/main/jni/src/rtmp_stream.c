@@ -1,99 +1,4 @@
-#include <jni.h>
-#include <android/log.h>
-#include <stdio.h>
-#include <queue.h>
-#include <pthread.h>
-#include <cpu-features.h>
-
-#define HAVE_X264
-
-#include "librtmp/rtmp.h"
-#include "librtmp/log.h"
-
-#include "faac.h"
-
-#ifdef HAVE_X264
-#include "x264.h"
-#include "common/common.h"
-#endif
-
-#define DEBUG
-#ifdef DEBUG
-#define LOGD(...) __android_log_print(ANDROID_LOG_DEBUG, "NDK", __VA_ARGS__)
-#else
-#define LOGD(...)
-#endif
-#define LOGI(...) __android_log_print(ANDROID_LOG_INFO,  "NDK", __VA_ARGS__)
-#define LOGW(...) __android_log_print(ANDROID_LOG_WARN,  "NDK", __VA_ARGS__)
-#define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, "NDK", __VA_ARGS__)
-
-enum {
-    S_START     = 100,
-    S_STOP      = 101,
-
-    E_AUDIO_ENCODER     = -102,
-    E_VIDEO_ENCODER     = -103,
-
-    E_RTMP_ALLOC        = -104,
-    E_RTMP_URL          = -105,
-    E_RTMP_CONNECT      = -106,
-    E_RTMP_STREAM       = -107,
-    E_RTMP_SEND         = -108,
-};
-
-
-#ifndef ULONG
-typedef unsigned long ULONG;
-#endif
-
-typedef struct jni_t {
-    JavaVM *jvm;
-    jobject pusher_obj;
-    jmethodID errorId;
-    jmethodID stateId;
-}jni_t;
-
-// audio
-typedef struct audio_enc_t {
-    faacEncHandle handle;
-    ULONG nMaxOutputBytes;
-    ULONG nInputSamples;
-}audio_enc_t;
-
-// video
-typedef struct video_enc_t {
-    x264_t *handle;
-    x264_picture_t *pic_in;
-    x264_picture_t *pic_out;
-    int y_len;
-    int u_v_len;
-
-    int width;
-    int height;
-    int bitrate;
-    int fps;
-}video_enc_t;
-
-// rtmp
-#define _RTMP_Free(_rtmp)  if(_rtmp) {RTMP_Free(_rtmp); _rtmp = NULL;}
-#define _RTMP_Close(_rtmp)  if(_rtmp && RTMP_IsConnected(_rtmp)) RTMP_Close(_rtmp);
-
-typedef struct proto_net_t {
-    RTMP *rtmp;
-    char* rtmp_path;
-}proto_net_t;
-
-
-typedef struct pusher_t {
-    int publishing;
-    int readyRtmp;
-    ULONG start_time;
-    ULONG timeoffset;
-
-    audio_enc_t audio;
-    video_enc_t video;
-    proto_net_t proto;
-}pusher_t;
+#include "common.h"
 
 static jni_t 	s_jni;
 static pusher_t s_pusher;
@@ -166,27 +71,24 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM *vm, void *reserved) {
     return JNI_VERSION_1_4;
 }
 
-void* publiser(void *args) {
-    JNIEnv *env;
-    (*s_jni.jvm)->AttachCurrentThread(s_jni.jvm, &env, 0);
-    if (env == NULL) {
-        LOGE("fail to attach jvm thread");
-        return NULL;
-    }
-
+int initJavaPusherNative(JNIEnv *env) {
     if (!s_jni.pusher_obj) {
-        LOGE("pusher_obj is NULL");
-        return NULL;
+        LOGE("[%s] pusher_obj is NULL", __FUNCTION__);
+        return -1;
     }
 
     jclass clazz = (*env)->GetObjectClass(env, s_jni.pusher_obj);
     if (!clazz) {
         LOGE("fail to get class from pusher_obj");
-        return NULL;
+        return -1;
     }
+
     s_jni.errorId = (*env)->GetMethodID(env, clazz, "onPostNativeError", "(I)V");
     s_jni.stateId = (*env)->GetMethodID(env, clazz, "onPostNativeState", "(I)V");
+    return 0;
+}
 
+void* publiser(void *args) {
 
     s_pusher.publishing = 1;
     do {
@@ -225,7 +127,7 @@ void* publiser(void *args) {
         }
 
         LOGI("RTMP Loop start");
-        throwNativeInfo(s_jni.stateId, S_START);
+        throwNativeInfo(s_jni.stateId, E_START);
         s_pusher.readyRtmp = 1;
 
         add_aac_sequence_header(&s_pusher.audio);
@@ -279,7 +181,7 @@ END:
     }
     destroy_queue();
 
-    throwNativeInfo(s_jni.stateId, S_STOP);
+    throwNativeInfo(s_jni.stateId, E_STOP);
 
     (*s_jni.jvm)->DetachCurrentThread(s_jni.jvm);
     pthread_exit(0);
@@ -296,12 +198,17 @@ void add_rtmp_packet(RTMPPacket *packet) {
 
 void add_aac_sequence_header(audio_enc_t *audio) {
     if (!audio || !audio->handle) {
+        LOGE("[%s] invalid audio enc", __FUNCTION__);
         return;
     }
 
-    ULONG len;
-    unsigned char *buf;
-    faacEncGetDecoderSpecificInfo(audio->handle, &buf, &len);
+    ULONG len = 0;
+    unsigned char *buf = NULL;
+    int ret = faacEncGetDecoderSpecificInfo(audio->handle, &buf, &len);
+    if (ret != 0) {
+        LOGE("[%s] fail to get enc info", __FUNCTION__);
+        return;
+    }
 
     RTMPPacket * packet = malloc(sizeof(RTMPPacket));
     RTMPPacket_Alloc(packet, len + 2);
@@ -312,6 +219,7 @@ void add_aac_sequence_header(audio_enc_t *audio) {
     body[0] = 0xAF;
     body[1] = 0x00;
     memcpy(&body[2], buf, len);
+
     packet->m_packetType = RTMP_PACKET_TYPE_AUDIO;
     packet->m_nBodySize = len + 2;
     packet->m_nChannel = 0x04;
@@ -382,13 +290,16 @@ void add_264_body(unsigned char * buf, int len) {
     int body_size = len + 9;
     RTMPPacket * packet = malloc(sizeof(RTMPPacket));
     RTMPPacket_Alloc(packet, len + 9);
+
     unsigned char * body = packet->m_body;
-    int type = buf[0] & 0x1f;
-    /*key frame*/
     body[0] = 0x27;
+
+    /*key frame*/
+    int type = buf[0] & 0x1f;
     if (type == NAL_SLICE_IDR) {
         body[0] = 0x17;
     }
+
     body[1] = 0x01; /*nal unit*/
     body[2] = 0x00;
     body[3] = 0x00;
@@ -407,13 +318,13 @@ void add_264_body(unsigned char * buf, int len) {
     packet->m_packetType = RTMP_PACKET_TYPE_VIDEO;
     packet->m_nChannel = 0x04;
     packet->m_headerType = RTMP_PACKET_SIZE_LARGE;
-    //packet->m_nTimeStamp = -1;
     packet->m_nTimeStamp = RTMP_GetTime() - s_pusher.start_time;
     add_rtmp_packet(packet);
 }
 
 void add_aac_body(unsigned char * buf, int len) {
-    //	encoder set outputformat = 1, ADTS's first 7 bytes; if outputformat=0, donot discard these 7 bytes
+    //	encoder set outputformat = 1, ADTS's first 7 bytes; 
+    //	if outputformat=0, donot discard these 7 bytes
     //	outputformat = 0
     //	buf += 7;
     //	len -= 7;
@@ -421,17 +332,18 @@ void add_aac_body(unsigned char * buf, int len) {
     int body_size = len + 2;
     RTMPPacket * packet = malloc(sizeof(RTMPPacket));
     RTMPPacket_Alloc(packet, body_size);
+
     unsigned char * body = packet->m_body;
     /* 0xAF01 + AAC RAW data */
     body[0] = 0xAF;
     body[1] = 0x01;
     memcpy(&body[2], buf, len);
+
     packet->m_packetType = RTMP_PACKET_TYPE_AUDIO;
     packet->m_nBodySize = body_size;
     packet->m_nChannel = 0x04;
     packet->m_hasAbsTimestamp = 0;
     packet->m_headerType = RTMP_PACKET_SIZE_MEDIUM;
-    //packet->m_nTimeStamp = -1;
     packet->m_nTimeStamp = RTMP_GetTime() - s_pusher.start_time;
     add_rtmp_packet(packet);
 }
@@ -453,17 +365,17 @@ void preset_x264_param(x264_param_t *param, video_enc_t *video) {
     x264_param_default_preset(param, "ultrafast", "zerolatency");
 
     //param.pf_log = x264_log_default2;
-    //param->i_level_idc = 52; 	// base_line: 5.2
-    param->i_level_idc = 51; 	// base_line: 5.2
+    param->i_level_idc = 52; 	// base_line: 5.2
     param->i_csp = X264_CSP_I420;
     param->i_width = video->width;
     param->i_height = video->height;
-    param->i_bframe = 0;
+    param->i_bframe = 1;
     param->b_repeat_headers = 1;
     param->i_fps_num = video->fps;
     param->i_fps_den = 1;
     param->b_vfr_input = 0;
-    param->i_keyint_max = video->fps * 1.5; //gop
+
+    param->i_keyint_max = video->fps * 2; //gop
     //param->i_keyint_min = X264_KEYINT_MIN_AUTO;
     param->i_keyint_min = 10;
     param->b_intra_refresh = 0;
@@ -476,8 +388,9 @@ void preset_x264_param(x264_param_t *param, video_enc_t *video) {
     param->rc.i_bitrate = video->bitrate / 1000;
     param->rc.i_vbv_max_bitrate = video->bitrate * 1.2 / 1000;
     param->rc.i_vbv_buffer_size = video->bitrate / 1000;
+
     param->rc.i_qp_max = 50;
-    param->rc.i_qp_min = 15;
+    param->rc.i_qp_min = 10;
     param->rc.i_qp_step = 4;
     param->rc.f_qcompress = 0.6;
 
@@ -504,13 +417,14 @@ void preset_x264_param(x264_param_t *param, video_enc_t *video) {
 
 void setAudioOptions(audio_enc_t *audio, jint sampleRate, jint channel, jint bitrate) {
     if (audio->handle) {
-        LOGD("audio encoder has been opened");
+        LOGD("[%s] encoder has been opened", __FUNCTION__);
         return;
     }
 
-    LOGD("set audio options: %d, %d, %d", sampleRate, channel, bitrate);
+    LOGD("[%s] set audio options: %d, %d, %d", __FUNCTION__, sampleRate, channel, bitrate);
     audio->handle = faacEncOpen(sampleRate, channel, &audio->nInputSamples, &audio->nMaxOutputBytes);
     if (!audio->handle) {
+        LOGD("[%s] fail to faacEncOpen", __FUNCTION__);
         throwNativeInfo(s_jni.errorId, E_AUDIO_ENCODER);
         return;
     }
@@ -528,9 +442,8 @@ void setAudioOptions(audio_enc_t *audio, jint sampleRate, jint channel, jint bit
     pConfiguration->bandWidth = 0;
     pConfiguration->shortctl = SHORTCTL_NORMAL;
 
-    if (!faacEncSetConfiguration(audio->handle, pConfiguration)) {
-        LOGE("audio encoder configration fail");
-    }
+    int ret = faacEncSetConfiguration(audio->handle, pConfiguration);
+    LOGI("[%s] encoder configration, ret=%d", __FUNCTION__, ret);
 }
 
 JNIEXPORT void JNICALL Java_com_zenvv_live_jni_PusherNative_setAudioOptions(
@@ -701,9 +614,13 @@ void startPusher(pusher_t *pusher, const char* path) {
 
 JNIEXPORT void JNICALL Java_com_zenvv_live_jni_PusherNative_startPusher(
         JNIEnv *env, jobject thiz, jstring url) {
-
     if (!s_jni.pusher_obj) {
         s_jni.pusher_obj = (*env)->NewGlobalRef(env, thiz);
+    }
+
+    int ret = initJavaPusherNative(env);
+    if (ret != 0) {
+        return;
     }
 
     const char* path = (*env)->GetStringUTFChars(env, url, 0);
@@ -725,17 +642,17 @@ JNIEXPORT void JNICALL Java_com_zenvv_live_jni_PusherNative_release(
 
     if (s_pusher.audio.handle) {
         faacEncClose(s_pusher.audio.handle);
-        s_pusher.audio.handle = 0;
+        s_pusher.audio.handle = NULL;
     }
 
     if (s_pusher.video.handle) {
         x264_encoder_close(s_pusher.video.handle);
-        s_pusher.video.handle = 0;
+        s_pusher.video.handle = NULL;
     }
 
     if (s_jni.pusher_obj) {
         (*env)->DeleteGlobalRef(env, s_jni.pusher_obj);
-        s_jni.pusher_obj = 0;
+        s_jni.pusher_obj = NULL;
     }
 
     x264_free(s_pusher.video.pic_in);
