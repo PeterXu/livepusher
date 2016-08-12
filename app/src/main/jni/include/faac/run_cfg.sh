@@ -5,6 +5,10 @@ ROOT=$(pwd)
 if [ "$1" = "clean" ]; then
     make distclean
     exit 0
+elif [ "$1" = "distclean" ]; then
+    make distclean
+    rm -rf out
+    exit 0
 fi
 
 if [ "$1" = "arm64" ]; then
