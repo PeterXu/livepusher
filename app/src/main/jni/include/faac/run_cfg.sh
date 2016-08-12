@@ -19,6 +19,7 @@ if [ "$1" = "arm64" ]; then
     ARCH=$1
     ABI="arm64-v8a"
     HOST=arm-linux
+    API=21
 else
     ARCH=arm
     HOST=${ARCH}-linux-androideabi
@@ -26,9 +27,10 @@ else
     TOOLCHANIN=${ARCH}-linux-androideabi-4.9
     ABI="armeabi-v7a"
     HOST=$ARCH-linux
+    API=15
 fi
 
-SYSROOT=$ANDROID_NDK/platforms/android-21/arch-${ARCH}
+SYSROOT=$ANDROID_NDK/platforms/android-${API}/arch-${ARCH}
 
 PATH=$PATH:$ANDROID_NDK/toolchains/$TOOLCHANIN/prebuilt/linux-x86_64/bin
 
