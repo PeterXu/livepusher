@@ -1,35 +1,45 @@
 #!/bin/bash
 
 ROOT=$(pwd)
-CC=`ndk-which gcc`
-CCPATH=`dirname $CC`
 
-ARCH=${ARCH:-arm}               # aarch64,arm
-EABI=${EABI:-armeabi-v7a}       # arm64-v8a,armeabi,armeabi-v7a,armeabi-v7a-neon
-HOST=$ARCH-linux
-SYSROOT=$ANDROID_NDK/platforms/android-9/arch-$ARCH
+if [ "$1" = "clean" ]; then
+    make distclean
+    exit 0
+fi
 
-export PATH=$PATH:$CCPATH
-export CC="$CC --sysroot=$SYSROOT"
-export CXX="$(ndk-which g++) --sysroot=$SYSROOT"
+if [ "$1" = "arm64" ]; then
+    ARCH=aarch64
+    HOST=${ARCH}-linux-android
+    CROSS_PREFIX=${ARCH}-linux-android-
+    TOOLCHANIN=${ARCH}-linux-android-4.9
+    ARCH=$1
+    ABI="arm64-v8a"
+    HOST=arm-linux
+else
+    ARCH=arm
+    HOST=${ARCH}-linux-androideabi
+    CROSS_PREFIX=${ARCH}-linux-androideabi-
+    TOOLCHANIN=${ARCH}-linux-androideabi-4.9
+    ABI="armeabi-v7a"
+    HOST=$ARCH-linux
+fi
+
+SYSROOT=$ANDROID_NDK/platforms/android-21/arch-${ARCH}
+
+PATH=$PATH:$ANDROID_NDK/toolchains/$TOOLCHANIN/prebuilt/linux-x86_64/bin
+
+export CC="${CROSS_PREFIX}gcc --sysroot=$SYSROOT"
+export CXX="${CROSS_PREFIX}g++ --sysroot=$SYSROOT"
 export LDFLAGS="-Wl,-rpath-link=$SYSROOT/usr/lib -L$SYSROOT/usr/lib -nostdlib -lc -lm -ldl -llog -lgcc"
 
-
-PREFIX="$ROOT/../libs/faac/$EABI"
-INCDIR="$ROOT/../libs/faac/include"
-rm -rf $PREFIX $INCDIR
-
-
 ./configure \
-    --prefix=$PREFIX \
-    --includedir=$INCDIR \
+    --prefix=$ROOT/out/$ABI \
     --enable-shared \
     --enable-static \
     --with-pic \
     --without-mp4v2 \
     --host=$HOST
 
-make clean || true
 make install
 
 
