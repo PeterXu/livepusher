@@ -7,11 +7,14 @@
 
 #define HAVE_X264
 
-#include "rtmp.h"
+#include "librtmp/rtmp.h"
+#include "librtmp/log.h"
+
 #include "faac.h"
 
 #ifdef HAVE_X264
 #include "x264.h"
+#include "common/common.h"
 #endif
 
 #define DEBUG
@@ -95,12 +98,12 @@ typedef struct pusher_t {
 static jni_t 	s_jni;
 static pusher_t s_pusher;
 
-static pthread_t s_tid;
 static pthread_mutex_t s_mutex = PTHREAD_MUTEX_INITIALIZER;
 static pthread_cond_t s_cond = PTHREAD_COND_INITIALIZER;
 
 
 
+void add_aac_sequence_header(audio_enc_t *audio);
 
 
 //===============================================
@@ -198,7 +201,7 @@ void* publiser(void *args) {
         RTMP_Init(s_pusher.proto.rtmp);
         s_pusher.proto.rtmp->Link.timeout = 5;
 
-        LOGI("RTMP_SetupURL RTMP is: 0x%x, path: %s", s_pusher.proto.rtmp, s_pusher.proto.rtmp_path);
+        LOGI("RTMP_SetupURL RTMP is: 0x%p, path: %s", s_pusher.proto.rtmp, s_pusher.proto.rtmp_path);
         if (!RTMP_SetupURL(s_pusher.proto.rtmp, s_pusher.proto.rtmp_path)) {
             throwNativeInfo(s_jni.errorId, E_RTMP_URL);
             goto END;
@@ -597,7 +600,10 @@ void setVideoOptions(video_enc_t *video, jint width, jint height, jint bitrate, 
     // set x264 param and open encoder
     x264_param_t param;
     preset_x264_param(&param, video);
-    LOGD("x264 param: %s", x264_param2string(&param,1));
+    char * paramstr = x264_param2string(&param,1);
+    LOGD("x264 param: %s", paramstr);
+    x264_free(paramstr);
+
     video->handle = x264_encoder_open(&param);
     if (!video->handle) {
         LOGI("Video encoder open fail");
@@ -688,7 +694,8 @@ void startPusher(pusher_t *pusher, const char* path) {
 
     RTMP_LogSetCallback(rtmp_log_debug);
 
-    pthread_create(&s_tid, NULL, publiser, NULL);
+    pthread_t tid;
+    pthread_create(&tid, NULL, publiser, NULL);
     pusher->start_time = RTMP_GetTime();
 }
 
