@@ -99,6 +99,7 @@ void releaseVideo(video_enc_t *video) {
     }
 
     if (video && video->pic_in) {
+        x264_picture_clean(video->pic_in);
         x264_free(video->pic_in);
     }
 

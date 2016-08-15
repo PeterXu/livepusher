@@ -7,6 +7,19 @@
 #include "queue.h"
 
 
+//> common
+#ifndef return_if_fail
+#define return_if_fail(p)       {if(!(p)) return;}
+#define returnv_if_fail(p, v)   {if(!(p)) return (v);}
+#define return_if(p)            {if(p) return;}
+#define returnv_if(p, v)        {if(p) return (v);}
+#endif
+
+#ifndef free_malloc
+#define free_malloc(p) {if(p) {free(p); (p)= NULL;}}
+#endif
+
+
 //> use x264
 #define HAVE_X264
 

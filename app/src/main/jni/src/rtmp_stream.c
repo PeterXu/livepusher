@@ -12,14 +12,9 @@ static pthread_cond_t s_cond = PTHREAD_COND_INITIALIZER;
 //=============================
 
 int checkPublishing(pusher_t *pusher) {
-    if (!pusher->publishing || !pusher->readyRtmp) {
-        return -1;
-    }
-
-    if (!pusher->proto.rtmp || !RTMP_IsConnected(pusher->proto.rtmp)) {
-        return -1;
-    }
-
+    returnv_if_fail(pusher, -1);
+    returnv_if(!pusher->publishing || !pusher->readyRtmp, -1);
+    //returnv_if_fail(RTMP_IsConnected(pusher->proto.rtmp), -1);
     return 0;
 }
 
@@ -37,7 +32,7 @@ static void rtmp_log_debug(int level, const char *format, va_list vl) {
 void throwNativeInfo(jmethodID methodId, int code) {
     JNIEnv* env = NULL;
     if((*s_jni.jvm)->AttachCurrentThread(s_jni.jvm, &env, NULL) != JNI_OK) {
-        LOGE("cannot get env from jvm");
+        LOGE("[%s] cannot get env", __FUNCTION__);
         return;
     }
 
@@ -64,20 +59,15 @@ void notifyNativeInfo(int level, int code) {
 
 JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM *vm, void *reserved) {
     JNIEnv* env = NULL;
-    jint result = -1;
+    if ((*vm)->GetEnv(vm, (void**) &env, JNI_VERSION_1_4) != JNI_OK) {
+        LOGE("[%s] jvm get env error", __FUNCTION__);
+        return -1;
+    }
 
     memset(&s_jni, 0, sizeof(s_jni));
     memset(&s_pusher, 0, sizeof(s_pusher));
-
     s_jni.jvm = vm;
-    if (vm) {
-        LOGD("jvm init success");
-    }
 
-    if ((*vm)->GetEnv(vm, (void**) &env, JNI_VERSION_1_4) != JNI_OK) {
-        LOGE("jvm get env error");
-        return result;
-    }
     return JNI_VERSION_1_4;
 }
 
@@ -113,7 +103,7 @@ void* publiser(void *args) {
         RTMP_Init(s_pusher.proto.rtmp);
         s_pusher.proto.rtmp->Link.timeout = 7;
 
-        LOGI("RTMP_SetupURL RTMP is: 0x%p, path: %s", s_pusher.proto.rtmp, s_pusher.proto.rtmp_path);
+        LOGI("RTMP_SetupURL RTMP path: %s", s_pusher.proto.rtmp_path);
         if (!RTMP_SetupURL(s_pusher.proto.rtmp, s_pusher.proto.rtmp_path)) {
             notifyNativeInfo(LOG_ERROR, E_RTMP_URL);
             goto END;
@@ -137,7 +127,7 @@ void* publiser(void *args) {
         }
 
         LOGI("RTMP Loop start");
-        notifyNativeInfo(LOG_ERROR, E_START);
+        notifyNativeInfo(LOG_STATE, E_START);
         s_pusher.readyRtmp = 1;
 
         add_aac_sequence_header(s_pusher.audio.handle);
@@ -178,8 +168,7 @@ END:
 
     s_pusher.readyRtmp = 0;
     s_pusher.publishing = 0;
-    free(s_pusher.proto.rtmp_path);
-    s_pusher.proto.rtmp_path = NULL;
+    free_malloc(s_pusher.proto.rtmp_path);
 
     int len = queue_size();
     for (int i = 0; i < len; ++i) {
@@ -206,10 +195,7 @@ void add_rtmp_packet(RTMPPacket *packet) {
 }
 
 void add_aac_sequence_header(faacEncHandle handle) {
-    if (!handle) {
-        LOGE("[%s] invalid audio enc", __FUNCTION__);
-        return;
-    }
+    return_if(!handle);
 
     ULONG len = 0;
     unsigned char *buf = NULL;
@@ -364,14 +350,14 @@ void add_aac_body(unsigned char * buf, int len) {
 
 JNIEXPORT void JNICALL Java_com_zenvv_live_jni_PusherNative_setAudioOptions(
         JNIEnv *env, jobject thiz, jint sampleRate, jint channel, jint bitrate) {
+    return_if(checkPublishing(&s_pusher) == 0);
+
     setAudioOptions(&s_pusher.audio, sampleRate, channel, bitrate);
 }
 
 JNIEXPORT void JNICALL Java_com_zenvv_live_jni_PusherNative_fireAudio(
         JNIEnv *env, jobject thiz, jbyteArray buffer, jint len) {
-    if (checkPublishing(&s_pusher) != 0) {
-        return;
-    }
+    return_if(checkPublishing(&s_pusher) != 0);
 
     jbyte* b_buffer = (*env)->GetByteArrayElements(env, buffer, 0);
     fireAudio(&s_pusher.audio, b_buffer, len);
@@ -389,14 +375,14 @@ JNIEXPORT jint JNICALL Java_com_zenvv_live_jni_PusherNative_getInputSamples() {
 
 JNIEXPORT void JNICALL Java_com_zenvv_live_jni_PusherNative_setVideoOptions(
         JNIEnv *env, jobject thiz, jint width, jint height, jint bitrate, jint fps) {
+    return_if(checkPublishing(&s_pusher) == 0);
+
     setVideoOptions(&s_pusher.video, width, height, bitrate, fps);
 }
 
 JNIEXPORT void JNICALL Java_com_zenvv_live_jni_PusherNative_fireVideo(
         JNIEnv *env, jobject thiz, jbyteArray buffer) {
-    if (checkPublishing(&s_pusher) != 0) {
-        return;
-    }
+    return_if(checkPublishing(&s_pusher) != 0);
 
     jbyte *nv21_buffer = (*env)->GetByteArrayElements(env, buffer, 0);
     fireVideo(&s_pusher.video, nv21_buffer);
@@ -411,17 +397,16 @@ JNIEXPORT void JNICALL Java_com_zenvv_live_jni_PusherNative_fireVideo(
 
 void startPusher(pusher_t *pusher, const char* path) {
     LOGI("Native start Pusher");
+    return_if(!pusher || !path);
 
-    pusher->proto.rtmp_path = malloc(strlen(path) + 1);
-    memset(pusher->proto.rtmp_path, 0, strlen(path) + 1);
-    memcpy(pusher->proto.rtmp_path, path, strlen(path));
     create_queue();
 
+    pusher->proto.rtmp_path = strdup(path);
+    pusher->start_time = RTMP_GetTime();
     RTMP_LogSetCallback(rtmp_log_debug);
 
     pthread_t tid;
     pthread_create(&tid, NULL, publiser, NULL);
-    pusher->start_time = RTMP_GetTime();
 }
 
 JNIEXPORT void JNICALL Java_com_zenvv_live_jni_PusherNative_startPusher(
@@ -430,10 +415,7 @@ JNIEXPORT void JNICALL Java_com_zenvv_live_jni_PusherNative_startPusher(
         s_jni.pusher_obj = (*env)->NewGlobalRef(env, thiz);
     }
 
-    int ret = initJavaPusherNative(env);
-    if (ret != 0) {
-        return;
-    }
+    return_if_fail(initJavaPusherNative(env) == 0);
 
     const char* path = (*env)->GetStringUTFChars(env, url, 0);
     startPusher(&s_pusher, path);
