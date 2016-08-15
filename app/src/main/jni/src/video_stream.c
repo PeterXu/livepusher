@@ -133,6 +133,7 @@ void preset_x264_param(x264_param_t *param, video_enc_t *video) {
     param->i_timebase_den = param->i_fps_num;
     param->i_timebase_num = param->i_fps_den;
     param->i_threads = threads;
+    param->b_sliced_threads = 0;
 
     param->rc.i_rc_method = X264_RC_ABR;
     param->rc.i_bitrate = video->bitrate / 1000;

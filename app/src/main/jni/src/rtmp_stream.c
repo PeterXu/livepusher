@@ -36,15 +36,16 @@ static void rtmp_log_debug(int level, const char *format, va_list vl) {
 
 void throwNativeInfo(jmethodID methodId, int code) {
     JNIEnv* env = NULL;
-    (*s_jni.jvm)->GetEnv(s_jni.jvm, (void**) &env, JNI_VERSION_1_4);
-    if (!env) {
+    if((*s_jni.jvm)->AttachCurrentThread(s_jni.jvm, &env, NULL) != JNI_OK) {
         LOGE("cannot get env from jvm");
         return;
     }
 
-    if (env && methodId && s_jni.pusher_obj) {
+    if (methodId && s_jni.pusher_obj) {
         (*env)->CallVoidMethodA(env, s_jni.pusher_obj, methodId, (jvalue *)&code);
     }
+
+    (*s_jni.jvm)->DetachCurrentThread(s_jni.jvm);
 }
 
 void notifyNativeInfo(int level, int code) {
@@ -101,7 +102,7 @@ void* publiser(void *args) {
 
     s_pusher.publishing = 1;
     do {
-        LOGE("start to RTMP_Alloc");
+        LOGI("start to RTMP_Alloc");
         s_pusher.proto.rtmp = RTMP_Alloc();
         if (!s_pusher.proto.rtmp) {
             notifyNativeInfo(LOG_ERROR, E_RTMP_ALLOC);
@@ -191,8 +192,6 @@ END:
     destroy_queue();
 
     notifyNativeInfo(LOG_STATE, E_STOP);
-
-    (*s_jni.jvm)->DetachCurrentThread(s_jni.jvm);
 
     pthread_exit(0);
 }

@@ -10,3 +10,5 @@ autom4te.cache
 mpeg4ip_config.h
 config.h.in~
 frontend/faac
+config.h
+stamp-h1
