@@ -17,7 +17,7 @@ LOCAL_SRC_FILES :=  \
 LOCAL_CFLAGS := -std=c99 -fPIC
 LOCAL_LDLIBS := -Wl,--no-warn-shared-textrel -Wl,-Bdynamic -llog -lz
 
-LOCAL_STATIC_LIBRARIES := faac x264 rtmp
+LOCAL_STATIC_LIBRARIES := faac x264 rtmp openh264
 LOCAL_STATIC_LIBRARIES += cpufeatures
 
 include $(BUILD_SHARED_LIBRARY)

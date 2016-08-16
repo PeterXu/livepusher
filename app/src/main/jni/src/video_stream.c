@@ -1,5 +1,8 @@
 #include "common.h"
 
+
+#ifdef HAVE_X264
+
 void preset_x264_param(x264_param_t *param, video_enc_t *video);
 void x264_log_default2(void *p_unused, int i_level, const char *psz_fmt, va_list arg);
 
@@ -82,7 +85,7 @@ int setVideoOptions(video_enc_t *video, jint width, jint height, jint bitrate, j
     video->handle = x264_encoder_open(&param);
     if (!video->handle) {
         LOGE("[%s] fail to open encoder", __FUNCTION__);
-        notifyNativeInfo(LOG_ERROR, E_AUDIO_ENCODER);
+        notifyNativeInfo(LOG_ERROR, E_VIDEO_ENCODER);
         return -1;
     }
 
@@ -170,3 +173,125 @@ void x264_log_default2(void *p_unused, int i_level, const char *psz_fmt, va_list
     }
 }
 
+#else
+
+int setVideoOptions(video_enc_t *video, jint width, jint height, jint bitrate, jint fps) {
+    LOGI("[%s] options: %dx%d, %dkb/s, %d", __FUNCTION__, width, height, bitrate/1000, fps);
+    if (video->handle) {
+        LOGD("[%s] encoder has been opened", __FUNCTION__);
+        if (video->height != height || video->width != width ||
+                video->fps != fps || video->bitrate != bitrate) {
+            releaseVideo(video);
+        } else {
+            return 0;
+        }
+    }
+
+    // save state
+    video->width = width;
+    video->height = height;
+    video->bitrate = bitrate;
+    video->fps = fps;
+    video->y_len = width * height;
+    video->u_v_len = video->y_len / 4;
+
+    int ret = -1;
+    do {
+        ISVCEncoder* pEncoder = NULL;
+        ret = WelsCreateSVCEncoder(&pEncoder);
+        if (ret != 0) {
+            LOGE("[%s] fail to open encoder", __FUNCTION__);
+            notifyNativeInfo(LOG_ERROR, E_VIDEO_ENCODER);
+            break;
+        }
+        video->handle = (void *)pEncoder;
+
+        int usageType = CAMERA_VIDEO_REAL_TIME;
+        SEncParamBase param;
+        memset (&param, 0, sizeof (SEncParamBase));
+        param.iUsageType = usageType;
+        param.fMaxFrameRate = video->fps;
+        param.iPicWidth = video->width;
+        param.iPicHeight = video->height;
+        param.iTargetBitrate = video->bitrate;
+        ret = (*pEncoder)->Initialize (pEncoder, &param);
+        if (ret != 0) {
+            LOGE("[%s] fail to config encoder", __FUNCTION__);
+            notifyNativeInfo(LOG_ERROR, E_VIDEO_ENCODER);
+            break;
+        }
+
+        int logLevel = WELS_LOG_INFO;
+        ret = (*pEncoder)->SetOption (pEncoder, ENCODER_OPTION_TRACE_LEVEL, &logLevel);
+
+        int videoFormat = videoFormatI420;
+        ret = (*pEncoder)->SetOption (pEncoder, ENCODER_OPTION_DATAFORMAT, &videoFormat);
+    }while(0);
+
+    if (ret != 0) {
+        releaseVideo(video);
+    }else {
+        video->pic_len = video->width * video->height * 3 / 2;
+        video->pic_in = malloc(video->pic_len+16);
+        memset(video->pic_in, 0, video->pic_len);
+    }
+
+    return ret;
+}
+
+void fireVideo(video_enc_t *video, uint8_t *nv21_buffer) {
+    if (!video || !video->handle) {
+        LOGE("video handle is NULL");
+        return;
+    }
+
+    int frameSize = video->width * video->height * 3 / 2;
+    if(video->pic_len < (size_t)frameSize) {
+        LOGE("frameSize is wrong: %d < %d", video->pic_len, frameSize);
+        return;
+    }
+
+    SFrameBSInfo info;
+    memset (&info, 0, sizeof (SFrameBSInfo));
+
+    SSourcePicture pic;
+    memset (&pic, 0, sizeof (SSourcePicture));
+    pic.iPicWidth = video->width;
+    pic.iPicHeight = video->height;
+    pic.iColorFormat = videoFormatI420;
+    pic.iStride[0] = pic.iPicWidth;
+    pic.iStride[1] = pic.iStride[2] = pic.iPicWidth >> 1;
+    pic.pData[0] = video->pic_in;
+    pic.pData[1] = pic.pData[0] + video->width * video->height;
+    pic.pData[2] = pic.pData[1] + (video->width * video->height >> 2);
+
+
+    // nv21 to yuv420p  y = w*h,u/v=w*h/4
+    // nv21 = yvu, yuv420p=yuv, y=y, u=y+1+1, v=y+1
+    uint8_t* u = pic.pData[1];
+    uint8_t* v = pic.pData[2];
+    memcpy(pic.pData[0], nv21_buffer, video->y_len);
+    for (int i = 0; i < video->u_v_len; i++) {
+        *(u + i) = *(nv21_buffer + video->y_len + i * 2 + 1);
+        *(v + i) = *(nv21_buffer + video->y_len + i * 2);
+    }
+
+    ISVCEncoder* pEncoder = (ISVCEncoder*)video->handle;
+    int rv = (*pEncoder)->EncodeFrame (pEncoder, &pic, &info);
+    if (rv == cmResultSuccess) {
+        if (info.eFrameType != videoFrameTypeSkip) {
+            //output bitstream
+        }
+    }
+}
+
+void releaseVideo(video_enc_t *video) {
+    if (video && video->handle) {
+        ISVCEncoder* pEncoder = (ISVCEncoder*)video->handle;
+        (*pEncoder)->Uninitialize(pEncoder);
+        WelsDestroySVCEncoder(pEncoder);
+        video->handle = NULL;
+    }
+}
+
+#endif

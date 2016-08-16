@@ -21,14 +21,17 @@
 
 
 //> use x264
-#define HAVE_X264
+//#define HAVE_X264
 
 #include "librtmp/rtmp.h"
 #include "librtmp/log.h"
 #include "faac.h"
+
 #ifdef HAVE_X264
 #include "x264.h"
 #include "common/common.h"
+#else
+#include "wels/codec_api.h"
 #endif
 
 
@@ -91,9 +94,14 @@ typedef struct audio_enc_t {
 
 //> video
 typedef struct video_enc_t {
-    x264_t *handle;
+    void *handle;
+#ifdef HAVE_X264
     x264_picture_t *pic_in;
     x264_picture_t *pic_out;
+#else
+    uint8_t *pic_in;
+    int pic_len;
+#endif
     int y_len;
     int u_v_len;
 
