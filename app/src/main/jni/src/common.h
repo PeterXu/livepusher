@@ -124,9 +124,8 @@ typedef struct proto_net_t {
 
 //> main entry struct
 typedef struct pusher_t {
-    int status;
+    int loop;
     int publishing;
-    int readyRtmp;
     ULONG start_time;
     ULONG timeoffset;
 

@@ -206,10 +206,10 @@ int setVideoOptions(video_enc_t *video, jint width, jint height, jint bitrate, j
         }
         video->handle = (void *)pEncoder;
 
-        int usageType = CAMERA_VIDEO_REAL_TIME;
         SEncParamBase param;
         memset (&param, 0, sizeof (SEncParamBase));
-        param.iUsageType = usageType;
+        param.iUsageType = CAMERA_VIDEO_REAL_TIME;
+        param.iRCMode = RC_BITRATE_MODE;
         param.fMaxFrameRate = video->fps;
         param.iPicWidth = video->width;
         param.iPicHeight = video->height;
@@ -220,6 +220,9 @@ int setVideoOptions(video_enc_t *video, jint width, jint height, jint bitrate, j
             notifyNativeInfo(LOG_ERROR, E_VIDEO_ENCODER);
             break;
         }
+
+        int idrPeriod = 16;
+        ret = (*pEncoder)->SetOption (pEncoder, ENCODER_OPTION_IDR_INTERVAL, &idrPeriod);
 
         int logLevel = WELS_LOG_INFO;
         ret = (*pEncoder)->SetOption (pEncoder, ENCODER_OPTION_TRACE_LEVEL, &logLevel);
@@ -241,13 +244,13 @@ int setVideoOptions(video_enc_t *video, jint width, jint height, jint bitrate, j
 
 void fireVideo(video_enc_t *video, uint8_t *nv21_buffer) {
     if (!video || !video->handle) {
-        LOGE("video handle is NULL");
+        LOGE("[%s] video handle is NULL", __FUNCTION__);
         return;
     }
 
     int frameSize = video->width * video->height * 3 / 2;
     if(video->pic_len < (size_t)frameSize) {
-        LOGE("frameSize is wrong: %d < %d", video->pic_len, frameSize);
+        LOGE("[%s] frameSize is wrong: %d < %d", __FUNCTION__, video->pic_len, frameSize);
         return;
     }
 
@@ -278,10 +281,56 @@ void fireVideo(video_enc_t *video, uint8_t *nv21_buffer) {
 
     ISVCEncoder* pEncoder = (ISVCEncoder*)video->handle;
     int rv = (*pEncoder)->EncodeFrame (pEncoder, &pic, &info);
-    if (rv == cmResultSuccess) {
-        if (info.eFrameType != videoFrameTypeSkip) {
-            //output bitstream
+    if (rv != cmResultSuccess) {
+        LOGE("[%s] fail to EncodeFrame", __FUNCTION__);
+        return;
+    }
+
+    if (info.eFrameType == videoFrameTypeSkip) {
+        LOGI("[%s] frame is videoFrameTypeSkip", __FUNCTION__);
+        return;
+    }
+
+    int sps_len, pps_len;
+    unsigned char sps[100];
+    unsigned char pps[100];
+    memset(sps, 0, 100);
+    memset(pps, 0, 100);
+
+#define NAL_HEADER_BYTES (4)
+#define NAL_TYPE (0x0F)
+#define SPS_NAL_TYPE (7)
+#define PPS_NAL_TYPE (8)
+#define SUBSETSPS_NAL_TYPE (15)
+#define GET_NAL_TYPE(pNalStart) (*(pNalStart+NAL_HEADER_BYTES) & NAL_TYPE)
+
+    // output bitstream
+    int iLayer = 0;
+    int iFrameSize = 0;
+    while (iLayer < info.iLayerNum) {
+        SLayerBSInfo* pLayerBsInfo = &info.sLayerInfo[iLayer];
+        if (pLayerBsInfo != NULL) {
+            uint8_t *pNalData = pLayerBsInfo->pBsBuf;
+
+            for (int k=0; k < pLayerBsInfo->iNalCount; k++) {
+                int iNalSize = pLayerBsInfo->pNalLengthInByte[k];
+                int iNalType = GET_NAL_TYPE(pNalData);
+                LOGE("[%s] iNalType=%d", __FUNCTION__, iNalType);
+
+                if (iNalType == NAL_SPS) { //sps
+                    sps_len = iNalSize - 4;
+                    memcpy(sps, pNalData + 4, sps_len);
+                } else if (iNalType == NAL_PPS) { //pps
+                    pps_len = iNalSize - 4;
+                    memcpy(pps, pNalData + 4, pps_len);
+                    add_264_sequence_header(pps, sps, pps_len, sps_len);
+                } else {
+                    add_264_body(pNalData, iNalSize);
+                }
+                pNalData += iNalSize;
+            }
         }
+        iLayer ++;
     }
 }
 

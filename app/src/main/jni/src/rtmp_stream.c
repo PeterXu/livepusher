@@ -13,7 +13,7 @@ static pthread_cond_t s_cond = PTHREAD_COND_INITIALIZER;
 
 int checkPublishing(pusher_t *pusher) {
     returnv_if_fail(pusher, -1);
-    returnv_if(!pusher->publishing || !pusher->readyRtmp, -1);
+    returnv_if(!pusher->publishing, -1);
     //returnv_if_fail(RTMP_IsConnected(pusher->proto.rtmp), -1);
     return 0;
 }
@@ -77,6 +77,10 @@ int initJavaPusherNative(JNIEnv *env) {
         return -1;
     }
 
+    if (s_jni.errorId > 0 && s_jni.stateId > 0) {
+        return 0;
+    }
+
     jclass clazz = (*env)->GetObjectClass(env, s_jni.pusher_obj);
     if (!clazz) {
         LOGE("[%s] fail to get class from pusher_obj", __FUNCTION__);
@@ -85,58 +89,68 @@ int initJavaPusherNative(JNIEnv *env) {
 
     s_jni.errorId = (*env)->GetMethodID(env, clazz, "onPostNativeError", "(I)V");
     s_jni.stateId = (*env)->GetMethodID(env, clazz, "onPostNativeState", "(I)V");
+
+    return 0;
+}
+
+int initProtoNet(proto_net_t *proto) {
+    returnv_if_fail(proto, -1);
+
+    LOGI("start to RTMP_Alloc");
+    proto->rtmp = RTMP_Alloc();
+    if (!proto->rtmp) {
+        notifyNativeInfo(LOG_ERROR, E_RTMP_ALLOC);
+        return -1;
+    }
+
+    LOGI("start to RTMP_Init");
+    RTMP_Init(proto->rtmp);
+    proto->rtmp->Link.timeout = 7;
+
+    LOGI("RTMP_SetupURL RTMP path: %s", proto->rtmp_path);
+    if (!RTMP_SetupURL(proto->rtmp, proto->rtmp_path)) {
+        notifyNativeInfo(LOG_ERROR, E_RTMP_URL);
+        return -1;
+    }
+
+    // should be called before RTMP_Connect
+    RTMP_EnableWrite(proto->rtmp);
+
+    // connect server
+    LOGI("start to RTMP_Connect");
+    if (!RTMP_Connect(proto->rtmp, NULL)) {
+        notifyNativeInfo(LOG_ERROR, E_RTMP_CONNECT);
+        return -1;
+    }
+
+    // connect stream
+    LOGI("start to RTMP_ConnectStream");
+    if (!RTMP_ConnectStream(proto->rtmp, 0)) {
+        notifyNativeInfo(LOG_ERROR, E_RTMP_STREAM);
+        return -1;
+    }
+
     return 0;
 }
 
 void* publiser(void *args) {
-
-    s_pusher.publishing = 1;
     do {
-        LOGI("start to RTMP_Alloc");
-        s_pusher.proto.rtmp = RTMP_Alloc();
-        if (!s_pusher.proto.rtmp) {
-            notifyNativeInfo(LOG_ERROR, E_RTMP_ALLOC);
-            goto END;
+        s_pusher.loop = 0;
+        if (initProtoNet(&s_pusher.proto) == 0) {
+            // add aac header
+            add_aac_sequence_header(s_pusher.audio.handle);
+            notifyNativeInfo(LOG_STATE, E_START);
+            s_pusher.loop = 1;
+            LOGI("Loop start");
         }
 
-        LOGI("start to RTMP_Init");
-        RTMP_Init(s_pusher.proto.rtmp);
-        s_pusher.proto.rtmp->Link.timeout = 7;
-
-        LOGI("RTMP_SetupURL RTMP path: %s", s_pusher.proto.rtmp_path);
-        if (!RTMP_SetupURL(s_pusher.proto.rtmp, s_pusher.proto.rtmp_path)) {
-            notifyNativeInfo(LOG_ERROR, E_RTMP_URL);
-            goto END;
-        }
-
-        // should be called before RTMP_Connect
-        RTMP_EnableWrite(s_pusher.proto.rtmp);
-
-        // connect server
-        LOGI("start to RTMP_Connect");
-        if (!RTMP_Connect(s_pusher.proto.rtmp, NULL)) {
-            notifyNativeInfo(LOG_ERROR, E_RTMP_CONNECT);
-            goto END;
-        }
-
-        // connect stream
-        LOGI("start to RTMP_ConnectStream");
-        if (!RTMP_ConnectStream(s_pusher.proto.rtmp, 0)) {
-            notifyNativeInfo(LOG_ERROR, E_RTMP_STREAM);
-            goto END;
-        }
-
-        LOGI("RTMP Loop start");
-        notifyNativeInfo(LOG_STATE, E_START);
-        s_pusher.readyRtmp = 1;
-
-        add_aac_sequence_header(s_pusher.audio.handle);
-        while (s_pusher.publishing) {
+        while (s_pusher.loop) {
             pthread_mutex_lock(&s_mutex);
             pthread_cond_wait(&s_cond, &s_mutex);
             if (!s_pusher.publishing) {
                 pthread_mutex_unlock(&s_mutex);
-                goto END;
+                sleep(1);
+                continue;
             }
 
             RTMPPacket *packet = queue_get_first();
@@ -152,22 +166,21 @@ void* publiser(void *args) {
                 if (!i) {
                     RTMPPacket_Free(packet);
                     notifyNativeInfo(LOG_ERROR, E_RTMP_SEND);
-                    goto END;
+                    break;
                 }
                 RTMPPacket_Free(packet);
             }
         }
 
-END:
         _RTMP_Close(s_pusher.proto.rtmp);
         _RTMP_Free(s_pusher.proto.rtmp);
+
+        s_pusher.loop = 0;
+        s_pusher.publishing = 0;
     } while (0);
 
 
     LOGI("Publishing Thread Exit!");
-
-    s_pusher.readyRtmp = 0;
-    s_pusher.publishing = 0;
     free_malloc(s_pusher.proto.rtmp_path);
 
     int len = queue_size();
@@ -187,7 +200,7 @@ END:
 
 void add_rtmp_packet(RTMPPacket *packet) {
     pthread_mutex_lock(&s_mutex);
-    if (s_pusher.publishing && s_pusher.readyRtmp) {
+    if (s_pusher.publishing) {
         queue_append_last(packet);
     }
     pthread_cond_signal(&s_cond);
@@ -405,6 +418,8 @@ void startPusher(pusher_t *pusher, const char* path) {
     pusher->start_time = RTMP_GetTime();
     RTMP_LogSetCallback(rtmp_log_debug);
 
+    s_pusher.publishing = 1;
+
     pthread_t tid;
     pthread_create(&tid, NULL, publiser, NULL);
 }
@@ -425,6 +440,7 @@ JNIEXPORT void JNICALL Java_com_zenvv_live_jni_PusherNative_startPusher(
 JNIEXPORT void JNICALL Java_com_zenvv_live_jni_PusherNative_stopPusher(
         JNIEnv *env, jobject thiz) {
     pthread_mutex_lock(&s_mutex);
+    s_pusher.loop = 0;
     s_pusher.publishing = 0;
     pthread_cond_signal(&s_cond);
     pthread_mutex_unlock(&s_mutex);
