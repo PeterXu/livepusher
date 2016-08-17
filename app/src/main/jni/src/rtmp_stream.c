@@ -134,53 +134,51 @@ int initProtoNet(proto_net_t *proto) {
 }
 
 void* publiser(void *args) {
-    do {
-        s_pusher.loop = 0;
-        if (initProtoNet(&s_pusher.proto) == 0) {
-            // add aac header
-            add_aac_sequence_header(s_pusher.audio.handle);
-            notifyNativeInfo(LOG_STATE, E_START);
-            s_pusher.loop = 1;
-            LOGI("Loop start");
-        }
+    if (initProtoNet(&s_pusher.proto) == 0) {
+        // add aac header
+        add_aac_sequence_header(s_pusher.audio.handle);
+        notifyNativeInfo(LOG_STATE, E_START);
+        s_pusher.loop = 1;
+        s_pusher.publishing = 1;
 
-        while (s_pusher.loop) {
-            pthread_mutex_lock(&s_mutex);
-            pthread_cond_wait(&s_cond, &s_mutex);
-            if (!s_pusher.publishing) {
-                pthread_mutex_unlock(&s_mutex);
-                sleep(1);
-                continue;
-            }
+        forceIDR(&s_pusher.video);
+    }
 
-            RTMPPacket *packet = queue_get_first();
-            if (packet) {
-                queue_delete_first();
-            }
+    LOGI("Loop start");
+    while (s_pusher.loop) {
+        pthread_mutex_lock(&s_mutex);
+        pthread_cond_wait(&s_cond, &s_mutex);
+        if (!s_pusher.publishing) {
             pthread_mutex_unlock(&s_mutex);
-
-            if (packet) {
-                queue_delete_first();
-                packet->m_nInfoField2 = s_pusher.proto.rtmp->m_stream_id;
-                int i = RTMP_SendPacket(s_pusher.proto.rtmp, packet, 1);
-                if (!i) {
-                    RTMPPacket_Free(packet);
-                    notifyNativeInfo(LOG_ERROR, E_RTMP_SEND);
-                    break;
-                }
-                RTMPPacket_Free(packet);
-            }
+            usleep(1500*1000);
+            continue;
         }
 
-        _RTMP_Close(s_pusher.proto.rtmp);
-        _RTMP_Free(s_pusher.proto.rtmp);
+        RTMPPacket *packet = queue_get_first();
+        if (packet) {
+            queue_delete_first();
+        }
+        pthread_mutex_unlock(&s_mutex);
 
-        s_pusher.loop = 0;
-        s_pusher.publishing = 0;
-    } while (0);
+        if (packet) {
+            queue_delete_first();
+            packet->m_nInfoField2 = s_pusher.proto.rtmp->m_stream_id;
+            int i = RTMP_SendPacket(s_pusher.proto.rtmp, packet, 1);
+            if (!i) {
+                RTMPPacket_Free(packet);
+                notifyNativeInfo(LOG_ERROR, E_RTMP_SEND);
+                break;
+            }
+            RTMPPacket_Free(packet);
+        }
+    }
 
+    _RTMP_Close(s_pusher.proto.rtmp);
+    _RTMP_Free(s_pusher.proto.rtmp);
 
     LOGI("Publishing Thread Exit!");
+    s_pusher.loop = 0;
+    s_pusher.publishing = 0;
     free_malloc(s_pusher.proto.rtmp_path);
 
     int len = queue_size();
@@ -414,11 +412,11 @@ void startPusher(pusher_t *pusher, const char* path) {
 
     create_queue();
 
+    free_malloc(s_pusher.proto.rtmp_path);
     pusher->proto.rtmp_path = strdup(path);
+
     pusher->start_time = RTMP_GetTime();
     RTMP_LogSetCallback(rtmp_log_debug);
-
-    s_pusher.publishing = 1;
 
     pthread_t tid;
     pthread_create(&tid, NULL, publiser, NULL);

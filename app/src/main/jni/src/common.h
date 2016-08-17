@@ -4,6 +4,7 @@
 #include <jni.h>
 #include <stdio.h>
 #include <pthread.h>
+#include <unistd.h>
 #include "queue.h"
 
 
@@ -139,6 +140,7 @@ typedef struct pusher_t {
 void fireVideo(video_enc_t *video, uint8_t *nv21_buffer);
 void releaseVideo(video_enc_t *video);
 int setVideoOptions(video_enc_t *video, int width, int height, int bitrate, int fps);
+void forceIDR(video_enc_t *video);
 
 //> audio methods
 void fireAudio(audio_enc_t *audio, uint8_t* data, int len);

@@ -95,6 +95,9 @@ int setVideoOptions(video_enc_t *video, jint width, jint height, jint bitrate, j
     return ret;
 }
 
+void forceIDR(video_enc_t *video) {
+}
+
 void releaseVideo(video_enc_t *video) {
     if (video && video->handle) {
         x264_encoder_close(video->handle);
@@ -331,6 +334,13 @@ void fireVideo(video_enc_t *video, uint8_t *nv21_buffer) {
             }
         }
         iLayer ++;
+    }
+}
+
+void forceIDR(video_enc_t *video) {
+    if (video && video->handle) {
+        ISVCEncoder* pEncoder = (ISVCEncoder*)video->handle;
+        (*pEncoder)->ForceIntraFrame(pEncoder, true);
     }
 }
 
